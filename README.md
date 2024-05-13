@@ -1,7 +1,7 @@
 
 # extractCs
 
-Extrator de dados de SQL Server - Para tabelas do Protheus TOTVS para bancos de dados de DataWarehouse.
+Extrator de dados de SQL Server - de tabelas do Protheus TOTVS para bancos de dados de DataWarehouse.
 
 
 ## Instalação
