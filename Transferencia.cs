@@ -1,28 +1,19 @@
 using System.Configuration;
 using System.Data;
+using System.Diagnostics.CodeAnalysis;
 using Microsoft.Data.SqlClient;
 
 namespace IntegraCs;
 
-public class InfoTab
-{
-    public required string NomeTab { get; set; }
-    public int? ValorIncremental { get; set; }
-    public string? NomeCol { get; set; }
-    public required string TipoTab { get; set; }
-}
 
 public class TransferenciaDados
 {
-    private const int PROTHEUS_TOTAL = 10;
-    private const int PROTHEUS_INC = 12;
+    private const string PROTHEUS_TOTAL = "T";
+    private const string PROTHEUS_INC = "I";
     private const int SUCESSO = 0;
-
     public string? logging;
-
     private string _connectionStringOrigin;
     private string _connectionStringDestination;
-
     private string _consultaTotal;
     private string _consultaIncremental;
 
@@ -35,82 +26,161 @@ public class TransferenciaDados
         _consultaIncremental = File.ReadAllText(@".\consulta_incremental.sql");
     }
 
-    public int Transferir()
+    public async Task<int> Transferir()
     {
-        DataTable listaExec = LerListaTab();
-        DataSet dadosProtheus = new();
+        DataTable listaExec = new();
 
-        foreach (DataRow row in listaExec.Rows)
+        try
+        {  
+            listaExec = LerListaTab(_connectionStringDestination);
+        }
+        catch (SqlException ex)
         {
-            InfoTab infoTab = new()
+            Console.WriteLine($"Erro Interno Servidor, {ex}");
+            throw;
+        }
+        
+        try
+        {
+            foreach (DataRow row in listaExec.Rows)
             {
-                NomeTab = row.Field<string>("NM_TABELA") ?? "",
-                ValorIncremental = row.Field<int?>("VL_INC_TABELA"),
-                NomeCol = row.Field<string?>("NM_COLUNA"),
-                TipoTab = row.Field<string>("TP_TABELA") ?? ""
-            };
-            string log1 = 
-                infoTab.TipoTab == "T" ? 
-                $"Extraindo Tabela: {infoTab.NomeTab}, do tipo Extracao Total" : 
-                $"Extraindo Tabela: {infoTab.NomeTab}, do tipo Extracao Incremental, com coluna {infoTab.NomeCol} filtrando {infoTab.ValorIncremental}";
-            logging += "<br>" + log1;
+                int? linhas = ContaLinhas($"PROTH_{row.Field<string>("NM_TABELA")}");
+                LimpaTabela(row, _connectionStringDestination, linhas);
+            }
+        }
+        catch (SqlException ex)
+        {
+            Console.WriteLine($"Erro Interno Servidor, {ex}");
+            throw;
+        }
+        
+        DataSet conjuntoDados = new();
 
-            Console.WriteLine(log1);
-            DataTable dados = LerDadosTab(infoTab, _consultaTotal, _consultaIncremental);
-
-            string log2 = $"Resgatado: {dados.Rows.Count} linhas\nAdicionando ao Dataset...";
-
-            logging += "<br>" + log2;
-            Console.WriteLine(log2);
-            dadosProtheus.Tables.Add(dados);
+        try
+        {
+            conjuntoDados = await ExtrairDados(listaExec);
+        }
+        catch (SqlException ex)
+        {
+            Console.WriteLine($"Erro Interno Servidor, {ex}");
+            throw;
         }
 
-        foreach (DataTable tabela in dadosProtheus.Tables)
-        {
-            string log3 = $"Inserindo em modo BULK os dados da tabela {tabela.TableName}, com quantidade: {tabela.Rows.Count} linhas";
 
-            logging += "<br>" + log3; 
-            Console.WriteLine(log3);
-            InserirDadosBulk(tabela);
+        string log4 = "Abrindo conexao com servidor de destino...";
+        logging += "<br>" + log4;
+        Console.WriteLine(log4);
+            
+        List<Task> tarefas = [];
+
+        try
+        {
+            foreach (DataTable tabela in conjuntoDados.Tables)
+            {
+                tarefas.Add(Task.Run(() => {
+                    string log5 = $"Inserindo em modo BULK os dados da tabela {tabela.TableName}, com quantidade: {tabela.Rows.Count} linhas";
+
+                    logging += "<br>" + log5; 
+                    Console.WriteLine(log5);
+                    InserirDadosBulk(tabela,_connectionStringDestination);
+                }));
+            }
+
+            await Task.WhenAll(tarefas);
+        }
+        catch (SqlException ex)
+        {
+            Console.WriteLine($"Erro Interno Servidor, {ex}");
+            throw;
+        }
+        finally
+        {
+            foreach (Task tarefa in tarefas)
+            {
+                tarefa.Dispose();
+            }
         }
 
         listaExec.Clear();
-        dadosProtheus.Clear();
+        conjuntoDados.Clear();
+        tarefas.Clear();
         return SUCESSO;
     }
 
-    private DataTable LerListaTab()
+    private async Task<DataSet> ExtrairDados(DataTable retorno)
+    {
+        DataSet dadosProtheus = new();
+
+        List<Task> tarefas = [];
+        
+        foreach(DataRow linhaExec in retorno.Rows)
+        {
+            tarefas.Add(Task.Run(() => {
+                string log1 = 
+                    linhaExec.Field<string>("TP_TABELA") == "T" ? 
+                    $"Extraindo Tabela: {linhaExec.Field<string>("NM_TABELA")}, do tipo Extracao Total" : 
+                    $"Extraindo Tabela: {linhaExec.Field<string>("NM_TABELA")}, do tipo Extracao Incremental, com coluna {linhaExec.Field<string>("NM_COLUNA")} filtrando {linhaExec.Field<int>("VL_INC_TABELA")}";
+                logging += "<br>" + log1;            
+                Console.WriteLine(log1);
+
+                DataTable dados = LerDadosTab(_consultaTotal, _consultaIncremental, _connectionStringOrigin, linhaExec.Field<string>("NM_TABELA"), linhaExec.Field<int>("VL_INC_TABELA"), linhaExec.Field<string>("NM_COLUNA"), linhaExec.Field<string>("TP_TABELA"));
+
+                string log2 = $"Resgatado: {dados.Rows.Count} linhas\nAdicionando ao Dataset...";
+                logging += "<br>" + log2;
+                Console.WriteLine(log2);
+
+                dadosProtheus.Tables.Add(dados);
+            }));
+        }
+        
+        await Task.WhenAll(tarefas);
+
+        foreach(Task tarefa in tarefas)
+        {
+            tarefa.Dispose();
+        }
+
+        tarefas.Clear();
+        dadosProtheus.Clear();
+
+        return dadosProtheus;
+    }
+
+    private DataTable LerListaTab(string conStr)
     {
         string log4 = "Resgatando Lista de extracao";
         logging += "<br>" + log4;
         Console.WriteLine(log4);
-        return Buscador("SELECT * FROM PROTH_EXTLIST;", null, null, null, null, _connectionStringDestination);
+        return Buscador("SELECT * FROM PROTH_EXTLIST;", conStr);
     }
 
-    private DataTable LerDadosTab(InfoTab infoTab, string consultaTotal, string consultaIncremental)
+    private DataTable LerDadosTab(string consultaTotal, string consultaIncremental, string conStr, string? NomeTab = null, int? ValorIncremental = null , string? NomeCol = null, string? TipoTab = null)
     {
-        if (infoTab.NomeTab == "")
+        if (NomeTab == "")
             throw new Exception("Sem entrada de dados para leitura!");
 
-        if (infoTab.TipoTab == "T" || ContaLinhas($"PROTH_{infoTab.NomeTab}") == 0)
+        if (TipoTab == "T" || ContaLinhas($"PROTH_{NomeTab}") == 0)
         {
-            return Buscador(consultaTotal, infoTab.NomeTab, null, null, PROTHEUS_TOTAL, _connectionStringOrigin);
+            return Buscador(consultaTotal, conStr, TipoTab, NomeTab);
         }
         else
         {
-            return Buscador(consultaIncremental, infoTab.NomeTab, infoTab.ValorIncremental, infoTab.NomeCol, PROTHEUS_INC, _connectionStringOrigin);
+            return Buscador(consultaIncremental, conStr, TipoTab, NomeTab, ValorIncremental, NomeCol);
         }
     }
 
-    private DataTable Buscador(string consulta, string? NomeTab, int? ValorIncremental, string? NomeCol, int? Tipo, string conStr)
+    private DataTable Buscador(string consulta, string conStr, string? Tipo = null, string? NomeTab = null, int? ValorIncremental = null, string? NomeCol = null)
     {
-        string log5 = "Abrindo conexao com servidor de origem...";
-        logging += "<br>" + log5;
-        Console.WriteLine(log5);
+        using SqlConnection connection = new() {
+            ConnectionString = conStr,
+        };
 
-        using SqlConnection connection = new(conStr);
+        string log1 = "Abrindo conexao com servidor de Origem...";
+        logging += "<br>" + log1;
+        Console.WriteLine(log1);
+
         connection.Open();
-        Console.WriteLine($"Conectado.");
+
         SqlCommand comando = new(consulta, connection);
         DataTable dados = new() { TableName = $"PROTH_{NomeTab}" };
         string log6 = NomeTab == null ? $"Armazenando lista de execucao em memoria..." : $"Criando tabela em memoria: {dados.TableName}...";
@@ -122,19 +192,11 @@ public class TransferenciaDados
         {
             case PROTHEUS_TOTAL:
                 comando.Parameters.AddWithValue("@TABELA_PROTHEUS", NomeTab);
-                dados.ExtendedProperties.Add("Tipo", Tipo);
                 break;
             case PROTHEUS_INC:
                 comando.Parameters.AddWithValue("@TABELA_PROTHEUS", NomeTab);
                 comando.Parameters.AddWithValue("@VL_CORTE", ValorIncremental.ToString());
                 comando.Parameters.AddWithValue("@COL_DT", NomeCol);
-                dados.ExtendedProperties.Add("Tipo", Tipo);
-                dados.ExtendedProperties.Add("Col", NomeCol);
-                dados.ExtendedProperties.Add("Corte", ValorIncremental);
-                string log7 = $"Adicionado os parametros Tipo:{dados.ExtendedProperties["Tipo"]}, Coluna:{dados.ExtendedProperties["Col"]}, Corte:{dados.ExtendedProperties["Corte"]}";
-                
-                logging += "<br>" + log7;
-                Console.WriteLine(log7);
                 break;
             default:
                 break;
@@ -146,50 +208,75 @@ public class TransferenciaDados
         adapter.Fill(dados);
 
         connection.Close();
+        connection.Dispose();
+       
+        adapter.Dispose();
         return dados;
     }
 
-    private void InserirDadosBulk(DataTable dados)
+    private void InserirDadosBulk(DataTable dados, string conStr)
     {
-        using SqlConnection connection = new(_connectionStringDestination);
-        connection.Open();
-        int? linhas = ContaLinhas(dados.TableName);
-        int tipo = Convert.ToInt16(dados.ExtendedProperties["Tipo"]?.ToString() ?? "");
-
-        SqlCommand command = new()
-        {
-            CommandTimeout = 100,
-            Connection = connection
+        using SqlConnection connection = new() {
+            ConnectionString = conStr
         };
 
-        switch ((linhas, tipo))
-        {
-            case (> 0, PROTHEUS_INC):
-                string log8 = $"Excluindo linhas recentes da tabela {dados.TableName}...";
-                logging += "<br>" + log8;
-                Console.WriteLine(log8);
-                command.CommandText = $"DELETE FROM {dados.TableName} WHERE {dados.ExtendedProperties["Col"]} >= GETDATE() - {dados.ExtendedProperties["Corte"]};";
-                command.ExecuteNonQuery();
-                break;
-            case (_, PROTHEUS_TOTAL):
-                string log9 = $"Truncando tabela {dados.TableName}...";
-                logging += "<br>" + log9;
-                Console.WriteLine(log9);
-                command.CommandText = $"TRUNCATE TABLE {dados.TableName}";
-                command.ExecuteNonQuery();
-                break;
-        }
+        string log2 = "Abrindo conexao com servidor de destino...";
+        logging += "<br>" + log2;
+        Console.WriteLine(log2);
+
+        connection.Open();
 
         using SqlBulkCopy bulkCopy = new(connection, SqlBulkCopyOptions.TableLock | SqlBulkCopyOptions.UseInternalTransaction, null);
         bulkCopy.BulkCopyTimeout = 1000;
         bulkCopy.DestinationTableName = dados.TableName;
         bulkCopy.WriteToServer(dados);
         connection.Close();
+        connection.Dispose();
+    }
+
+    private void LimpaTabela(DataRow retorno, string conStr, int? linhas)
+    {
+        using SqlConnection connection = new() {
+            ConnectionString = conStr
+        };
+
+        SqlCommand command = new("", connection);
+
+        switch ((linhas, retorno.Field<string>("TP_TABELA")))
+        {
+            case (> 0, PROTHEUS_INC):
+                string log8 = $"Excluindo linhas recentes da tabela PROTH_{retorno.Field<string>("NM_TABELA")}...";
+                logging += "<br>" + log8;
+                Console.WriteLine(log8);
+                command.CommandText = $"DELETE FROM PROTH_{retorno.Field<string>("NM_TABELA")} WHERE {retorno.Field<string>("NM_COLUNA")} >= GETDATE() - {retorno.Field<int>("VL_INC_TABELA")};";
+                command.ExecuteNonQuery();
+                break;
+            case (_, PROTHEUS_TOTAL):
+                string log9 = $"Truncando tabela PROTH_{retorno.Field<string>("NM_TABELA")}...";
+                logging += "<br>" + log9;
+                Console.WriteLine(log9);
+                command.CommandText = $"TRUNCATE TABLE PROTH_{retorno.Field<string>("NM_TABELA")}";
+                command.ExecuteNonQuery();
+                break;
+            default:
+                break;
+        }
+
+        connection.Close();
+        connection.Dispose();
     }
 
     private int? ContaLinhas(string NomeTab)
     {
-        using SqlConnection connection = new(_connectionStringDestination);
+        using SqlConnection connection = new()
+        {
+            ConnectionString = _connectionStringDestination
+        };
+
+        string log2 = "Abrindo conexao com servidor de destino para validacao...";
+        logging += "<br>" + log2;
+        Console.WriteLine(log2);
+
         connection.Open();
 
         using SqlCommand command = new($"SELECT COUNT(1) FROM {NomeTab} WITH(NOLOCK);", connection);
@@ -198,6 +285,7 @@ public class TransferenciaDados
 
         int? count = Convert.ToInt32(exec == DBNull.Value ? 0 : exec);
         connection.Close();
+        connection.Dispose();
         return count;
     }
 }

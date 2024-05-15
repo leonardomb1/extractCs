@@ -62,10 +62,9 @@ public class Servidor
             {
                 Console.WriteLine("Recebido pedido de execucao...");
                 int exec = 5;
-                extracting = true;
                 try
                 {
-                    exec = puxarProtheus.Transferir();
+                    exec = puxarProtheus.Transferir().Result;
                 }
                 catch (Exception ex)
                 {
