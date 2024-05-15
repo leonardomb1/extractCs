@@ -1,6 +1,5 @@
 using System.Configuration;
 using System.Data;
-using System.Diagnostics.CodeAnalysis;
 using Microsoft.Data.SqlClient;
 
 namespace IntegraCs;
@@ -40,18 +39,25 @@ public class TransferenciaDados
             throw;
         }
         
+        SqlConnection connectionLk = new(_connectionStringDestination);
+        
         try
         {
+            connectionLk.Open();
             foreach (DataRow row in listaExec.Rows)
             {
-                int? linhas = ContaLinhas($"PROTH_{row.Field<string>("NM_TABELA")}");
-                LimpaTabela(row, _connectionStringDestination, linhas);
+                LimpaTabela(row, connectionLk);
             }
         }
         catch (SqlException ex)
         {
             Console.WriteLine($"Erro Interno Servidor, {ex}");
             throw;
+        }
+        finally
+        {
+            connectionLk.Close();
+            connectionLk.Dispose();
         }
         
         DataSet conjuntoDados = new();
@@ -123,7 +129,7 @@ public class TransferenciaDados
                 logging += "<br>" + log1;            
                 Console.WriteLine(log1);
 
-                DataTable dados = LerDadosTab(_consultaTotal, _consultaIncremental, _connectionStringOrigin, linhaExec.Field<string>("NM_TABELA"), linhaExec.Field<int>("VL_INC_TABELA"), linhaExec.Field<string>("NM_COLUNA"), linhaExec.Field<string>("TP_TABELA"));
+                DataTable dados = LerDadosTab(_consultaTotal, _consultaIncremental, _connectionStringOrigin, linhaExec.Field<string?>("NM_TABELA"), linhaExec.Field<int?>("VL_INC_TABELA"), linhaExec.Field<string?>("NM_COLUNA"), linhaExec.Field<string?>("TP_TABELA"));
 
                 string log2 = $"Resgatado: {dados.Rows.Count} linhas\nAdicionando ao Dataset...";
                 logging += "<br>" + log2;
@@ -159,13 +165,13 @@ public class TransferenciaDados
         if (NomeTab == "")
             throw new Exception("Sem entrada de dados para leitura!");
 
-        if (TipoTab == "T" || ContaLinhas($"PROTH_{NomeTab}") == 0)
+        if (TipoTab == PROTHEUS_TOTAL || ContaLinhas($"PROTH_{NomeTab}") == 0)
         {
-            return Buscador(consultaTotal, conStr, TipoTab, NomeTab);
+            return Buscador(consultaTotal, conStr, PROTHEUS_TOTAL, NomeTab);
         }
         else
         {
-            return Buscador(consultaIncremental, conStr, TipoTab, NomeTab, ValorIncremental, NomeCol);
+            return Buscador(consultaIncremental, conStr, PROTHEUS_INC, NomeTab, ValorIncremental, NomeCol);
         }
     }
 
@@ -234,11 +240,13 @@ public class TransferenciaDados
         connection.Dispose();
     }
 
-    private void LimpaTabela(DataRow retorno, string conStr, int? linhas)
+    private void LimpaTabela(DataRow retorno, SqlConnection connection)
     {
-        using SqlConnection connection = new() {
-            ConnectionString = conStr
-        };
+        using SqlCommand commandCont = new($"SELECT COUNT(1) FROM PROTH_{retorno.Field<string>("NM_TABELA")} WITH(NOLOCK);", connection);
+        commandCont.CommandTimeout = 100;
+        var exec = commandCont.ExecuteScalar();
+
+        int? linhas = Convert.ToInt32(exec == DBNull.Value ? 0 : exec);
 
         SqlCommand command = new("", connection);
 
@@ -261,9 +269,6 @@ public class TransferenciaDados
             default:
                 break;
         }
-
-        connection.Close();
-        connection.Dispose();
     }
 
     private int? ContaLinhas(string NomeTab)
