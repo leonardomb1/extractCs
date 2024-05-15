@@ -134,8 +134,10 @@ public class TransferenciaDados
                 string log2 = $"Resgatado: {dados.Rows.Count} linhas\nAdicionando ao Dataset...";
                 logging += "<br>" + log2;
                 Console.WriteLine(log2);
-
-                dadosProtheus.Tables.Add(dados);
+                lock (this)
+                {
+                    dadosProtheus.Tables.Add(dados);
+                }
             }));
         }
         
@@ -147,8 +149,7 @@ public class TransferenciaDados
         }
 
         tarefas.Clear();
-        dadosProtheus.Clear();
-
+        
         return dadosProtheus;
     }
 
