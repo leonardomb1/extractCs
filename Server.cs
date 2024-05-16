@@ -56,11 +56,11 @@ public class Servidor
 
             if (req.Url?.AbsolutePath != "/favicon.ico")
                 pageViews += 1;
-                puxarProtheus.logging = "";
 
             if ((req.HttpMethod == "POST") && (req?.Url?.AbsolutePath == "/extract"))
             {
                 Console.WriteLine("Recebido pedido de execucao...");
+                puxarProtheus.logging = "";
                 int exec = 5;
                 try
                 {
@@ -68,7 +68,6 @@ public class Servidor
                 }
                 catch (Exception ex)
                 {
-                    puxarProtheus.logging = "";
                     Console.WriteLine($"Erro de execução na transferência de dados: {ex.Message}, {ex.InnerException}");
                     File.AppendAllText(@$".\log\log_{pageViews}.txt", "\nExecução: " + DateTime.Now.ToString() + "\n" + puxarProtheus.logging + "\nErro:\n" + ex.ToString());
                 }

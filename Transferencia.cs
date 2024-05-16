@@ -16,6 +16,8 @@ public class TransferenciaDados
     private string _consultaTotal;
     private string _consultaIncremental;
 
+    private object _lock = new();
+
     public TransferenciaDados()
     {
         
@@ -134,7 +136,7 @@ public class TransferenciaDados
                 string log2 = $"Resgatado: {dados.Rows.Count} linhas\nAdicionando ao Dataset...";
                 logging += "<br>" + log2;
                 Console.WriteLine(log2);
-                lock (this)
+                lock (_lock)
                 {
                     dadosProtheus.Tables.Add(dados);
                 }
