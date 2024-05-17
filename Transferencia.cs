@@ -27,13 +27,13 @@ public class TransferenciaDados
         _consultaIncremental = File.ReadAllText(@".\consulta_incremental.sql");
     }
 
-    public async Task<int> Transferir()
+    public async Task<int> Transferir(int agenda)
     {
-        DataTable listaExec = new();
+        List<DataRow> listaExec = [];
 
         try
         {  
-            listaExec = LerListaTab(_connectionStringDestination);
+            listaExec = BuscaAgenda(agenda, _connectionStringDestination);
         }
         catch (SqlException ex)
         {
@@ -46,7 +46,7 @@ public class TransferenciaDados
         try
         {
             connectionLk.Open();
-            foreach (DataRow row in listaExec.Rows)
+            foreach (DataRow row in listaExec)
             {
                 LimpaTabela(row, connectionLk);
             }
@@ -115,13 +115,31 @@ public class TransferenciaDados
         return SUCESSO;
     }
 
-    private async Task<DataSet> ExtrairDados(DataTable retorno)
+    private List<DataRow> BuscaAgenda(int agenda, string conStr) {
+        DataTable retorno = Buscador(
+            @$" SELECT 
+                    LIS.*, 
+                    AG.VL_RECORRENCIA 
+                FROM PROTH_EXTLIST AS LIS 
+                INNER JOIN DW_AGENDADOR AS AG 
+                    ON AG.ID_DW_AGENDADOR = LIS.ID_DW_AGENDADOR", conStr
+            );
+        
+        var result = 
+            from lin in retorno.AsEnumerable()
+            where lin.Field<int>("ID_DW_AGENDADOR") == agenda
+            select lin;
+
+        return result.ToList();
+    }
+
+    private async Task<DataSet> ExtrairDados(List<DataRow> retorno)
     {
         DataSet dadosProtheus = new();
 
         List<Task> tarefas = [];
         
-        foreach(DataRow linhaExec in retorno.Rows)
+        foreach(DataRow linhaExec in retorno)
         {
             tarefas.Add(Task.Run(() => {
                 string log1 = 
@@ -153,14 +171,6 @@ public class TransferenciaDados
         tarefas.Clear();
         
         return dadosProtheus;
-    }
-
-    private DataTable LerListaTab(string conStr)
-    {
-        string log4 = "Resgatando Lista de extracao";
-        logging += "<br>" + log4;
-        Console.WriteLine(log4);
-        return Buscador("SELECT * FROM PROTH_EXTLIST;", conStr);
     }
 
     private DataTable LerDadosTab(string consultaTotal, string consultaIncremental, string conStr, string? NomeTab = null, int? ValorIncremental = null , string? NomeCol = null, string? TipoTab = null)

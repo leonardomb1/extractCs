@@ -4,7 +4,7 @@ public class Program
 {
     public static void Main()
     {
-        Servidor extracao = new();
-        extracao.Servico();
+        Agenda agenda = new();
+        agenda.Agendador();
     }
 }
