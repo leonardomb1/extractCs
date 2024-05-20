@@ -33,6 +33,7 @@ public class Agenda
         Dictionary<Action<int>, TimeSpan> agendas = [];
 
         Console.WriteLine("Instanciando agenciador...");
+        Console.WriteLine("Pressione qualquer tecla para parar...");
 
         foreach(DataRow row in agenda.Rows)
         {
@@ -59,7 +60,6 @@ public class Agenda
             subscriptions.Add(subscription);
         }
 
-        Console.WriteLine("Pressione alguma tecla para parar..");
         Console.ReadKey();
 
         foreach (var subscription in subscriptions)
