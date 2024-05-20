@@ -31,7 +31,6 @@ public class Agenda
     {
         DataTable agenda = GetAgenda();
         Dictionary<Action<int>, TimeSpan> agendas = [];
-        TransferenciaDados transferencia = new();
 
         Console.WriteLine("Instanciando agenciador...");
 
@@ -42,7 +41,7 @@ public class Agenda
                 new Action<int>(async (_) => 
                 {
                     Console.WriteLine($"Executando agenda: {row.Field<string>("NM_AGENDA")}...");
-                    await transferencia.Transferir(row.Field<int>("ID_DW_AGENDADOR"));
+                    await new TransferenciaDados().Transferir(row.Field<int>("ID_DW_AGENDADOR"));
                 }),
                 TimeSpan.FromSeconds(row.Field<int>("VL_RECORRENCIA"))
             );
@@ -55,7 +54,7 @@ public class Agenda
             var subscription = Observable.Interval(actionEntry.Value)
                                         .Subscribe(_ =>
                                         {
-                                            actionEntry.Key.Invoke(agendas.Keys.GetHashCode());
+                                            actionEntry.Key.Invoke(actionEntry.Key.GetHashCode());
                                         });
             subscriptions.Add(subscription);
         }
