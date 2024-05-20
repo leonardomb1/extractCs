@@ -9,7 +9,6 @@ public class TransferenciaDados
 {
     private const string PROTHEUS_TOTAL = "T";
     private const string PROTHEUS_INC = "I";
-    private const int SUCESSO = 0;
     public static string? logging;
     private string _connectionStringOrigin ;
     private string _connectionStringDestination;
