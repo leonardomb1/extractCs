@@ -1,13 +1,13 @@
 using System.Configuration;
 using System.Data;
+using System.Reactive.Linq;
 using Microsoft.Data.SqlClient;
 
 namespace IntegraCs;
 
 public class Agenda
 {
-    private static string _con;
-    private List<System.Timers.Timer> timers = [];
+    private static string _con = "";
     public Agenda()
     {
         _con = ConfigurationManager.ConnectionStrings["DataWarehouse"].ConnectionString;
@@ -27,45 +27,45 @@ public class Agenda
         return tabela;
     }
 
-    private static async void OnTimedEvent(object? source, int agenda)
-    {
-        Console.WriteLine($"Iniciando transferencia de dados. Agenda ID : {agenda}");
-        TransferenciaDados dados = new();
-        await dados.Transferir(agenda);
-        ((System.Timers.Timer)source).Start(); 
-    }
-
     public void Agendador()
     {
         DataTable agenda = GetAgenda();
-        Dictionary<int, TimeSpan> agendas = [];
+        Dictionary<Action<int>, TimeSpan> agendas = [];
+        TransferenciaDados transferencia = new();
+
         Console.WriteLine("Instanciando agenciador...");
 
         foreach(DataRow row in agenda.Rows)
         {
-        Console.WriteLine($"Carregando agenda {row.Field<string>("NM_AGENDA")}...");
+            Console.WriteLine($"Carregando agenda: {row.Field<string>("NM_AGENDA")}...");
             agendas.Add(
-                    row.Field<int>("ID_DW_AGENDADOR"),
-                    TimeSpan.FromMinutes(row.Field<int>("VL_RECORRENCIA"))
-                );
+                new Action<int>(async (_) => 
+                {
+                    Console.WriteLine($"Executando agenda: {row.Field<string>("NM_AGENDA")}...");
+                    await transferencia.Transferir(row.Field<int>("ID_DW_AGENDADOR"));
+                }),
+                TimeSpan.FromSeconds(row.Field<int>("VL_RECORRENCIA"))
+            );
         }
-        
-        System.Timers.Timer timer = new() 
-        {
-            Interval = agendas.First().Value.TotalMilliseconds,
-            AutoReset = false
-        };
 
-        timer.Elapsed += delegate { OnTimedEvent(timer, agendas.First().Key); };
-        timer.Start();
-        // foreach(KeyValuePair<int, TimeSpan> time in agendas)
-        // {
-        //     timer.Interval = time.Value.TotalMilliseconds,
-        //     timer.AutoReset = false;
-        //     timer.Elapsed += delegate { OnTimedEvent(timer, time.Key); };
-        //     Console.WriteLine($"Iniciando Agenda ID : {time.Key}, com valor de : {time.Value.Minutes} min.");
-        //     timer.Start();
-        //     timers.Add(timer);
-        // }
+        List<IDisposable> subscriptions = [];
+
+        foreach (var actionEntry in agendas)
+        {
+            var subscription = Observable.Interval(actionEntry.Value)
+                                        .Subscribe(_ =>
+                                        {
+                                            actionEntry.Key.Invoke(agendas.Keys.GetHashCode());
+                                        });
+            subscriptions.Add(subscription);
+        }
+
+        Console.WriteLine("Pressione alguma tecla para parar..");
+        Console.ReadKey();
+
+        foreach (var subscription in subscriptions)
+        {
+            subscription.Dispose();
+        }
     }
 }

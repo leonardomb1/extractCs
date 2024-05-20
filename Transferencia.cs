@@ -10,13 +10,13 @@ public class TransferenciaDados
     private const string PROTHEUS_TOTAL = "T";
     private const string PROTHEUS_INC = "I";
     private const int SUCESSO = 0;
-    public string? logging;
-    private string _connectionStringOrigin;
+    public static string? logging;
+    private string _connectionStringOrigin ;
     private string _connectionStringDestination;
     private string _consultaTotal;
     private string _consultaIncremental;
 
-    private object _lock = new();
+    private static object _lock = new();
 
     public TransferenciaDados()
     {
@@ -27,7 +27,7 @@ public class TransferenciaDados
         _consultaIncremental = File.ReadAllText(@".\consulta_incremental.sql");
     }
 
-    public async Task<int> Transferir(int agenda)
+    public async Task Transferir(int agenda)
     {
         List<DataRow> listaExec = [];
 
@@ -105,6 +105,7 @@ public class TransferenciaDados
         {
             foreach (Task tarefa in tarefas)
             {
+                Console.WriteLine("Concluído.");
                 tarefa.Dispose();
             }
         }
@@ -112,10 +113,9 @@ public class TransferenciaDados
         listaExec.Clear();
         conjuntoDados.Clear();
         tarefas.Clear();
-        return SUCESSO;
     }
 
-    private List<DataRow> BuscaAgenda(int agenda, string conStr) {
+    private static List<DataRow> BuscaAgenda(int agenda, string conStr) {
         DataTable retorno = Buscador(
             @$" SELECT 
                     LIS.*, 
@@ -188,7 +188,7 @@ public class TransferenciaDados
         }
     }
 
-    private DataTable Buscador(string consulta, string conStr, string? Tipo = null, string? NomeTab = null, int? ValorIncremental = null, string? NomeCol = null)
+    private static DataTable Buscador(string consulta, string conStr, string? Tipo = null, string? NomeTab = null, int? ValorIncremental = null, string? NomeCol = null)
     {
         using SqlConnection connection = new() {
             ConnectionString = conStr,
@@ -233,7 +233,7 @@ public class TransferenciaDados
         return dados;
     }
 
-    private void InserirDadosBulk(DataTable dados, string conStr)
+    private static void InserirDadosBulk(DataTable dados, string conStr)
     {
         using SqlConnection connection = new() {
             ConnectionString = conStr
@@ -253,7 +253,7 @@ public class TransferenciaDados
         connection.Dispose();
     }
 
-    private void LimpaTabela(DataRow retorno, SqlConnection connection)
+    private static void LimpaTabela(DataRow retorno, SqlConnection connection)
     {
         using SqlCommand commandCont = new($"SELECT COUNT(1) FROM PROTH_{retorno.Field<string>("NM_TABELA")} WITH(NOLOCK);", connection);
         commandCont.CommandTimeout = 100;
