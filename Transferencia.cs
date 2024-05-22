@@ -58,7 +58,7 @@ public class TransferenciaDados
                         tarefas.Add(Task.Run(async () => {
                             try
                             {
-                                await BuscadorPacotes(_consultaTotal, PROTHEUS_TOTAL, tabela);
+                                await BuscadorPacotes(PROTHEUS_TOTAL, tabela);
                                 await LogOperation(Operador.FINAL_LEITURA_PACOTE, $"Concluído extração para: {tabela}", _connectionStringDestination, SUCESSO);
                             }
                             catch (SqlException ex)
@@ -71,7 +71,7 @@ public class TransferenciaDados
                         tarefas.Add(Task.Run(async () => {
                             try 
                             {
-                                await BuscadorPacotes(_consultaIncremental, PROTHEUS_INC, tabela, corte, coluna);
+                                await BuscadorPacotes(PROTHEUS_INC, tabela, corte, coluna);
                                 await LogOperation(Operador.FINAL_LEITURA_PACOTE, $"Concluído extração para: {tabela}", _connectionStringDestination, SUCESSO);
                             }
                             catch (SqlException ex)
@@ -126,7 +126,7 @@ public class TransferenciaDados
         return result.ToList();
     }
 
-    private async Task BuscadorPacotes(string consulta, string Tipo, string? NomeTab = null, int? ValorIncremental = null, string? NomeCol = null)
+    private async Task BuscadorPacotes(string Tipo, string? NomeTab = null, int? ValorIncremental = null, string? NomeCol = null)
     {     
         using SqlConnection connection = new() {
             ConnectionString = _connectionStringOrigin,
@@ -138,15 +138,22 @@ public class TransferenciaDados
         try
         {
             await LogOperation(Operador.INIC_SQL, $"Criando tabela temporaria: ##T_{NomeTab}_DW_SEL...", _connectionStringDestination, SUCESSO);
-            using SqlCommand criarTabelaTemp = new(consulta, connection);
+            using SqlCommand criarTabelaTemp = new(connection);
             switch ((linhas, Tipo))
             {
                 case (_, PROTHEUS_TOTAL):
                     await LogOperation(Operador.ABRIR_CONEXAO, $"Conexão aberta para extração do tipo Total da tabela: {NomeTab}...", _connectionStringDestination, SUCESSO);
+                    criarTabelaTemp.CommandText = _consultaTotal;
+                    criarTabelaTemp.Parameters.AddWithValue("@TABELA_PROTHEUS", NomeTab);
+                    break;
+                case (== 0, _):
+                    await LogOperation(Operador.ABRIR_CONEXAO, $"Conexão aberta para extração do tipo Total da tabela: {NomeTab}...", _connectionStringDestination, SUCESSO);
+                    criarTabelaTemp.CommandText = _consultaTotal;
                     criarTabelaTemp.Parameters.AddWithValue("@TABELA_PROTHEUS", NomeTab);
                     break;
                 case (> 0, PROTHEUS_INC):
                     await LogOperation(Operador.ABRIR_CONEXAO, $"Conexão aberta para extração do tipo Incremental da tabela: {NomeTab}...", _connectionStringDestination, SUCESSO);
+                    criarTabelaTemp.CommandText = _consultai;
                     criarTabelaTemp.Parameters.AddWithValue("@TABELA_PROTHEUS", NomeTab);
                     criarTabelaTemp.Parameters.AddWithValue("@VL_CORTE", ValorIncremental.ToString());
                     criarTabelaTemp.Parameters.AddWithValue("@COL_DT", NomeCol);
