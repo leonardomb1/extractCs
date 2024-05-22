@@ -138,7 +138,9 @@ public class TransferenciaDados
         try
         {
             await LogOperation(Operador.INIC_SQL, $"Criando tabela temporaria: ##T_{NomeTab}_DW_SEL...", _connectionStringDestination, SUCESSO);
-            using SqlCommand criarTabelaTemp = new(connection);
+            using SqlCommand criarTabelaTemp = new() {
+                Connection = connection
+            };
             switch ((linhas, Tipo))
             {
                 case (_, PROTHEUS_TOTAL):
@@ -146,14 +148,14 @@ public class TransferenciaDados
                     criarTabelaTemp.CommandText = _consultaTotal;
                     criarTabelaTemp.Parameters.AddWithValue("@TABELA_PROTHEUS", NomeTab);
                     break;
-                case (== 0, _):
+                case (0, _):
                     await LogOperation(Operador.ABRIR_CONEXAO, $"Conexão aberta para extração do tipo Total da tabela: {NomeTab}...", _connectionStringDestination, SUCESSO);
                     criarTabelaTemp.CommandText = _consultaTotal;
                     criarTabelaTemp.Parameters.AddWithValue("@TABELA_PROTHEUS", NomeTab);
                     break;
                 case (> 0, PROTHEUS_INC):
                     await LogOperation(Operador.ABRIR_CONEXAO, $"Conexão aberta para extração do tipo Incremental da tabela: {NomeTab}...", _connectionStringDestination, SUCESSO);
-                    criarTabelaTemp.CommandText = _consultai;
+                    criarTabelaTemp.CommandText = _consultaIncremental;
                     criarTabelaTemp.Parameters.AddWithValue("@TABELA_PROTHEUS", NomeTab);
                     criarTabelaTemp.Parameters.AddWithValue("@VL_CORTE", ValorIncremental.ToString());
                     criarTabelaTemp.Parameters.AddWithValue("@COL_DT", NomeCol);
