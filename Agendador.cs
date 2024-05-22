@@ -5,14 +5,21 @@ using Microsoft.Data.SqlClient;
 
 namespace IntegraCs;
 
+public class AgendaInfo
+{
+    public required Action<int> Action {get; set;}
+    public required TimeSpan Tempo {get; set;}
+    public required bool IsRunning {get; set;}
+}
+
 public class Agenda
 {
-    private static string _con = "";
+    private string _con;
     public Agenda()
     {
         _con = ConfigurationManager.ConnectionStrings["DataWarehouse"].ConnectionString;
     }
-    private static DataTable GetAgenda()
+    private DataTable GetAgenda()
     {
         Console.WriteLine("Resgantando agendas de execucao...");
         using SqlConnection connection = new(_con);
@@ -30,7 +37,7 @@ public class Agenda
     public void Agendador()
     {
         DataTable agenda = GetAgenda();
-        Dictionary<Action<int>, TimeSpan> agendas = [];
+        Dictionary<int, AgendaInfo> agendas = [];
 
         Console.WriteLine("Instanciando agenciador...");
         Console.WriteLine("Pressione qualquer tecla para parar...");
@@ -38,26 +45,39 @@ public class Agenda
         foreach(DataRow row in agenda.Rows)
         {
             Console.WriteLine($"Carregando agenda: {row.Field<string>("NM_AGENDA")}...");
-            agendas.Add(
-                new Action<int>(async (_) => 
+            int id = row.Field<int>("ID_DW_AGENDADOR");
+            agendas[id] = new AgendaInfo
+            {
+                Action = new Action<int>(async (_) => 
                 {
+                    if (agendas[id].IsRunning) return;
+
                     Console.WriteLine($"Executando agenda: {row.Field<string>("NM_AGENDA")}...");
-                    await new TransferenciaDados().Transferir(row.Field<int>("ID_DW_AGENDADOR"));
+                    agendas[id].IsRunning = true;
+                    TransferenciaDados dados = new();
+                    await dados.Transferir(id);
+                    agendas[id].IsRunning = false;
+                    GC.Collect(dados.GetHashCode(), GCCollectionMode.Optimized);
                 }),
-                TimeSpan.FromSeconds(row.Field<int>("VL_RECORRENCIA"))
-            );
+                Tempo = TimeSpan.FromSeconds(row.Field<int>("VL_RECORRENCIA")),
+                IsRunning = false
+            };
         }
 
         List<IDisposable> subscriptions = [];
 
         foreach (var actionEntry in agendas)
         {
-            var subscription = Observable.Interval(actionEntry.Value)
-                                        .Subscribe(_ =>
-                                        {
-                                            actionEntry.Key.Invoke(actionEntry.Key.GetHashCode());
-                                        });
-            subscriptions.Add(subscription);
+            if (!actionEntry.Value.IsRunning) 
+            {
+                var subscription = 
+                    Observable.Interval(actionEntry.Value.Tempo)
+                        .Subscribe(_ =>
+                        {
+                            actionEntry.Value.Action.Invoke(actionEntry.Key.GetHashCode());
+                        });
+                subscriptions.Add(subscription);
+            }
         }
 
         Console.ReadKey();
