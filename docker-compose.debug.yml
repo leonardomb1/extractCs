@@ -1,0 +1,13 @@
+
+version: '3.4'
+
+services:
+  integracs:
+    image: integracs
+    build:
+      context: .
+      dockerfile: ./Dockerfile
+      args:
+        - configuration=Debug
+    volumes:
+      - ~/.vsdbg:/remote_debugger:rw

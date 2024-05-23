@@ -1,6 +1,8 @@
 using System.Configuration;
 using System.Data;
+using System.Globalization;
 using Microsoft.Data.SqlClient;
+using Salaros.Configuration;
 
 namespace IntegraCs;
 
@@ -14,15 +16,24 @@ public class TransferenciaDados
     private string _connectionStringOrigin ;
     private string _connectionStringDestination;
     private string _consultaTotal;
+    private int _tamPacote;
     private string _consultaIncremental;
 
     public TransferenciaDados()
     {
+        var config = new ConfigParser("/app/config.ini", new ConfigParserSettings 
+            {
+                MultiLineValues = 
+                    MultiLineValues.Simple | 
+                    MultiLineValues.AllowValuelessKeys | 
+                    MultiLineValues.QuoteDelimitedValues, Culture = new CultureInfo("en-US")
+            });
+        _tamPacote = int.Parse(config.GetValue("Packet", "pacoteSql"));
         
         _connectionStringOrigin = ConfigurationManager.ConnectionStrings["Protheus"].ConnectionString;
         _connectionStringDestination = ConfigurationManager.ConnectionStrings["DataWarehouse"].ConnectionString;
-        _consultaTotal = File.ReadAllText(@".\consulta_total.sql");
-        _consultaIncremental = File.ReadAllText(@".\consulta_incremental.sql");
+        _consultaTotal = File.ReadAllText("/app/consulta_total.sql");
+        _consultaIncremental = File.ReadAllText("/app/consulta_incremental.sql");
     }
     public async Task Transferir(int agenda)
     {
@@ -148,7 +159,7 @@ public class TransferenciaDados
                     criarTabelaTemp.CommandText = _consultaTotal;
                     criarTabelaTemp.Parameters.AddWithValue("@TABELA_PROTHEUS", NomeTab);
                     break;
-                case (0, _):
+                case (0, PROTHEUS_INC):
                     await LogOperation(Operador.ABRIR_CONEXAO, $"Conexão aberta para extração do tipo Total da tabela: {NomeTab}...", _connectionStringDestination, SUCESSO);
                     criarTabelaTemp.CommandText = _consultaTotal;
                     criarTabelaTemp.Parameters.AddWithValue("@TABELA_PROTHEUS", NomeTab);
@@ -196,8 +207,7 @@ public class TransferenciaDados
             {
                 pacote.Columns.Add(reader.GetName(i), reader.GetFieldType(i));
             }
-            
-            const int BatchSize = 10000; 
+
             while (reader.ReadAsync().Result)
             {
                 DataRow row = pacote.NewRow();
@@ -207,9 +217,9 @@ public class TransferenciaDados
                 }
                 pacote.Rows.Add(row);
 
-                if (pacote.Rows.Count >= BatchSize)
+                if (pacote.Rows.Count >= _tamPacote)
                 {
-                    await LogOperation(Operador.INIC_INSERT_BULK, $"Iniciando BULK Insert da tabela: {NomeTab} com {pacote.Rows.Count}", _connectionStringDestination, SUCESSO);
+                    await LogOperation(Operador.INIC_INSERT_BULK, $"Iniciando BULK Insert da tabela: {NomeTab} com {pacote.Rows.Count} Linhas.", _connectionStringDestination, SUCESSO);
                     InserirDadosBulk(pacote, _connectionStringDestination);
                     pacote.Clear();
                     await LogOperation(Operador.INIC_INSERT_BULK, $"Finalizado BULK Insert da tabela: {NomeTab}", _connectionStringDestination, SUCESSO);
@@ -225,7 +235,7 @@ public class TransferenciaDados
         }
         catch (SqlException ex)
         {
-            await LogOperation(Operador.ERRO_SQL, $"Erro SQL: {ex.ErrorCode} na tabela {NomeTab}", _connectionStringDestination, FALHA);
+            await LogOperation(Operador.ERRO_SQL, $"Erro SQL: {ex} na tabela {NomeTab} ao tentar executar inserção de dados", _connectionStringDestination, FALHA);
         }
         finally
         {
@@ -308,11 +318,11 @@ public class TransferenciaDados
             case (> 0, PROTHEUS_INC):
                 command.CommandText = 
                     @$" DELETE FROM PROTH_{retorno.Field<string>("NM_TABELA")} 
-                        WHERE {retorno.Field<string>("NM_COLUNA")} >= GETDATE() - {retorno.Field<int>("VL_INC_TABELA")};";
+                        WHERE [{retorno.Field<string>("NM_COLUNA")}] >= GETDATE() - {retorno.Field<int>("VL_INC_TABELA")};";
                 command.ExecuteNonQuery();
                 break;
             case (_, PROTHEUS_TOTAL):
-                command.CommandText = $"TRUNCATE TABLE PROTH_{retorno.Field<string>("NM_TABELA")}";
+                command.CommandText = $"TRUNCATE TABLE PROTH_{retorno.Field<string>("NM_TABELA")};";
                 command.ExecuteNonQuery();
                 break;
             default:

@@ -1,7 +1,3 @@
--- LEONARDO MACHADO BAPTISTA 07.05.24
--- REALIZA UNIÃO DE TABELAS DE DIFERENTES EMPRESAS, TENDO COMO BASE A EMPRESA 01.
-
------------------------------------------------------------
 /* 
 ***********************************
 ******* RESGATAR METADADOS ********
@@ -81,8 +77,3 @@ BEGIN
 END
 CLOSE PROCURA
 DEALLOCATE PROCURA;
-
--- DECLARE @CONSULTA NVARCHAR(MAX) = 
---     N'SELECT *, GETDATE(), GETDATE() FROM ##T_' + @TABELA_PROTHEUS + '_DW_SEL
---     DROP TABLE IF EXISTS ##T_' + @TABELA_PROTHEUS + '_DW_SEL';
--- EXEC sp_executesql @CONSULTA;

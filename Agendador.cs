@@ -15,9 +15,12 @@ public class AgendaInfo
 public class Agenda
 {
     private string _con;
+
+    private TransferenciaDados _transferenciaDados;
     public Agenda()
     {
         _con = ConfigurationManager.ConnectionStrings["DataWarehouse"].ConnectionString;
+        _transferenciaDados = new TransferenciaDados();
     }
     private DataTable GetAgenda()
     {
@@ -54,10 +57,9 @@ public class Agenda
 
                     Console.WriteLine($"Executando agenda: {row.Field<string>("NM_AGENDA")}...");
                     agendas[id].IsRunning = true;
-                    TransferenciaDados dados = new();
-                    await dados.Transferir(id);
+                    await _transferenciaDados.Transferir(id);
                     agendas[id].IsRunning = false;
-                    GC.Collect(dados.GetHashCode(), GCCollectionMode.Optimized);
+                    GC.Collect(id, GCCollectionMode.Forced);
                 }),
                 Tempo = TimeSpan.FromSeconds(row.Field<int>("VL_RECORRENCIA")),
                 IsRunning = false
@@ -80,7 +82,7 @@ public class Agenda
             }
         }
 
-        Console.ReadKey();
+        Console.In.ReadLine();
 
         foreach (var subscription in subscriptions)
         {
