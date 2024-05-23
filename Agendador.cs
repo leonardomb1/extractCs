@@ -80,7 +80,7 @@ public class Agenda
             }
         }
 
-        Console.ReadKey();
+        Console.In.ReadLine();
 
         foreach (var subscription in subscriptions)
         {
