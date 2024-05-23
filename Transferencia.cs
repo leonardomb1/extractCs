@@ -219,7 +219,7 @@ public class TransferenciaDados
 
                 if (pacote.Rows.Count >= _tamPacote)
                 {
-                    await LogOperation(Operador.INIC_INSERT_BULK, $"Iniciando BULK Insert da tabela: {NomeTab} com {pacote.Rows.Count}", _connectionStringDestination, SUCESSO);
+                    await LogOperation(Operador.INIC_INSERT_BULK, $"Iniciando BULK Insert da tabela: {NomeTab} com {pacote.Rows.Count} Linhas.", _connectionStringDestination, SUCESSO);
                     InserirDadosBulk(pacote, _connectionStringDestination);
                     pacote.Clear();
                     await LogOperation(Operador.INIC_INSERT_BULK, $"Finalizado BULK Insert da tabela: {NomeTab}", _connectionStringDestination, SUCESSO);

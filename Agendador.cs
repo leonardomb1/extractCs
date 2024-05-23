@@ -57,7 +57,7 @@ public class Agenda
                     TransferenciaDados dados = new();
                     await dados.Transferir(id);
                     agendas[id].IsRunning = false;
-                    GC.Collect(dados.GetHashCode(), GCCollectionMode.Optimized);
+                    GC.Collect(dados.GetHashCode(), GCCollectionMode.Forced);
                 }),
                 Tempo = TimeSpan.FromSeconds(row.Field<int>("VL_RECORRENCIA")),
                 IsRunning = false
