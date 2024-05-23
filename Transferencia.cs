@@ -159,7 +159,7 @@ public class TransferenciaDados
                     criarTabelaTemp.CommandText = _consultaTotal;
                     criarTabelaTemp.Parameters.AddWithValue("@TABELA_PROTHEUS", NomeTab);
                     break;
-                case (0, _):
+                case (0, PROTHEUS_INC):
                     await LogOperation(Operador.ABRIR_CONEXAO, $"Conexão aberta para extração do tipo Total da tabela: {NomeTab}...", _connectionStringDestination, SUCESSO);
                     criarTabelaTemp.CommandText = _consultaTotal;
                     criarTabelaTemp.Parameters.AddWithValue("@TABELA_PROTHEUS", NomeTab);
