@@ -35,8 +35,6 @@ public class TransferenciaDados : IDisposable
         _connectionStringDestination = ConfigurationManager.ConnectionStrings["DataWarehouse"].ConnectionString;
         _consultaTotal = File.ReadAllText("/app/consulta_total.sql");
         _consultaIncremental = File.ReadAllText("/app/consulta_incremental.sql");
-
-
     }
 
     public void Dispose()
@@ -64,23 +62,12 @@ public class TransferenciaDados : IDisposable
         SqlConnection connectionLk = new(_connectionStringDestination);
         List<Task> tarefas = [];
 
-        using SqlCommand execState = new() {
-            CommandText = 
-                @$"
-                    INSERT INTO DW_EXECUCAO (ID_DW_SISTEMA, ID_DW_AGENDADOR)
-                    OUTPUT INSERTED.ID_DW_EXECUCAO
-                    VALUES ({1}, {agenda})
-                ",
-            Connection = connectionLk
-        };
-
-        _numExec = (int) execState.ExecuteScalar();
+        _numExec = InitExec(_connectionStringDestination, agenda);
 
         try
         {
             listaExec = BuscaAgenda(agenda, _connectionStringDestination);
             await LogOperation(Operador.BUSCA_AGENDA, "Resgatado Agendas.", _connectionStringDestination, _numExec, SUCESSO);
-
             
             connectionLk.Open();
             foreach (DataRow row in listaExec)
@@ -356,6 +343,28 @@ public class TransferenciaDados : IDisposable
         update.Dispose();
         updater.Dispose();
     } 
+
+    private static int InitExec(string conStr, int agenda)
+    {
+        using SqlConnection connection = new(conStr);  
+        connection.Open();  
+        using SqlCommand execState = new() {
+            CommandText = 
+                @$"
+                    INSERT INTO DW_EXECUCAO (ID_DW_SISTEMA, ID_DW_AGENDADOR)
+                    OUTPUT INSERTED.ID_DW_EXECUCAO
+                    VALUES ({1}, {agenda})
+                ",
+            Connection = connection
+        };
+
+        int exec = (int) execState.ExecuteScalar();
+
+        connection.Close();
+        connection.Dispose();
+        execState.Dispose();
+        return exec;
+    }
 
     private static void LimpaTabela(DataRow retorno, SqlConnection connection)
     {
