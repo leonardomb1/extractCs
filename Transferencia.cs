@@ -22,7 +22,7 @@ public class TransferenciaDados : IDisposable
 
     public TransferenciaDados()
     {
-        var config = new ConfigParser(@".\config.ini", new ConfigParserSettings 
+        var config = new ConfigParser("/app/config.ini", new ConfigParserSettings 
             {
                 MultiLineValues = 
                     MultiLineValues.Simple | 
@@ -32,8 +32,8 @@ public class TransferenciaDados : IDisposable
         _tamPacote = int.Parse(config.GetValue("Packet", "pacoteSql"));
         _connectionStringOrigin = ConfigurationManager.ConnectionStrings["Protheus"].ConnectionString;
         _connectionStringDestination = ConfigurationManager.ConnectionStrings["DataWarehouse"].ConnectionString;
-        _consultaTotal = File.ReadAllText(@".\consulta_total.sql");
-        _consultaIncremental = File.ReadAllText(@".\consulta_incremental.sql");
+        _consultaTotal = File.ReadAllText("/app/consulta_total.sql");
+        _consultaIncremental = File.ReadAllText("/app/consulta_incremental.sql");
     }
 
     public void Dispose()
