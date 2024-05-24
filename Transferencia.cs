@@ -341,7 +341,16 @@ public class TransferenciaDados : IDisposable
     {
         using SqlConnection updater = new(conStr);
         await updater.OpenAsync();
-        using SqlCommand update = new($"UPDATE DW_EXECUCAO SET VF_STATUS = {status} WHERE ID_DW_EXECUCAO = {numExec};", updater);
+        using SqlCommand update = new() {
+            CommandText = 
+                $@"
+                    UPDATE DW_EXECUCAO SET VF_STATUS = {status} 
+                    WHERE ID_DW_EXECUCAO = {numExec};
+
+                    UPDATE DW_EXECUCAO SET DT_FIM_EXEC = GETDATE()
+                    WHERE ID_DW_EXECUCAO = {numExec};
+                "
+        };
         await update.ExecuteNonQueryAsync();
         updater.Close();
         update.Dispose();
