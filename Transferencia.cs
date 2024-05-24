@@ -143,7 +143,7 @@ public class TransferenciaDados : IDisposable
         }
     }
 
-    private static List<DataRow> BuscaAgenda(int agenda, string conStr) {
+    private static List<DataRow> BuscaAgenda(int? agenda, string conStr) {
         DataTable retorno = Buscador(
             @$" SELECT 
                     LIS.*
@@ -152,7 +152,7 @@ public class TransferenciaDados : IDisposable
         
         var result = 
             from lin in retorno.AsEnumerable()
-            where lin.Field<int>("ID_DW_AGENDADOR") == agenda
+            where lin.Field<int?>("ID_DW_AGENDADOR") == agenda
             select lin;
 
         return result.ToList();
@@ -357,8 +357,8 @@ public class TransferenciaDados : IDisposable
                 ",
             Connection = connection
         };
-
-        int exec = (int) execState.ExecuteScalar();
+        var ret = execState.ExecuteScalar();
+        int exec = Convert.ToInt32(ret == DBNull.Value ? 0 : ret);
 
         connection.Close();
         connection.Dispose();
@@ -370,9 +370,9 @@ public class TransferenciaDados : IDisposable
     {
         using SqlCommand commandCont = new($"SELECT COUNT(1) FROM PROTH_{retorno.Field<string>("NM_TABELA")} WITH(NOLOCK);", connection);
         commandCont.CommandTimeout = 100;
+        var exec = commandCont.ExecuteScalar();
 
-        int linhas = (int) commandCont.ExecuteScalar();
-
+        int linhas = Convert.ToInt32(exec == DBNull.Value ? 0 : exec);
         SqlCommand command = new("", connection);
 
         switch ((linhas, retorno.Field<string>("TP_TABELA")))
@@ -420,8 +420,9 @@ public class TransferenciaDados : IDisposable
 
         using SqlCommand command = new($"SELECT COUNT(1) FROM {NomeTab} WITH(NOLOCK);", connection);
         command.CommandTimeout = 100;
+        var exec = command.ExecuteScalar();
 
-        int count = (int) command.ExecuteScalar();
+        int? count = Convert.ToInt32(exec == DBNull.Value ? 0 : exec);
         await connection.CloseAsync();
         return count;
     }
