@@ -15,12 +15,9 @@ public class AgendaInfo
 public class Agenda
 {
     private string _con;
-
-    private TransferenciaDados _transferenciaDados;
     public Agenda()
     {
         _con = ConfigurationManager.ConnectionStrings["DataWarehouse"].ConnectionString;
-        _transferenciaDados = new TransferenciaDados();
     }
     private DataTable GetAgenda()
     {
@@ -55,11 +52,12 @@ public class Agenda
                 {
                     if (agendas[id].IsRunning) return;
 
+                    TransferenciaDados dados = new();
                     Console.WriteLine($"Executando agenda: {row.Field<string>("NM_AGENDA")}...");
                     agendas[id].IsRunning = true;
-                    await _transferenciaDados.Transferir(id);
+                    await dados.Transferir(id);
                     agendas[id].IsRunning = false;
-                    GC.Collect(id, GCCollectionMode.Forced);
+                    dados.Dispose();
                 }),
                 Tempo = TimeSpan.FromSeconds(row.Field<int>("VL_RECORRENCIA")),
                 IsRunning = false
