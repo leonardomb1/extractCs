@@ -25,7 +25,7 @@ public class TransferenciaDados : IDisposable
             root = @".\app\"; 
         }
         else {
-            root = "/app/";
+            root = "./app/";
         } 
 
         var config = new ConfigParser(Path.Combine(root, "config.ini"), new ConfigParserSettings 
