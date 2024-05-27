@@ -23,6 +23,4 @@ WORKDIR /app
 
 COPY --from=publish /app/publish .
 
-COPY ["config.ini", "./"]
-
 ENTRYPOINT ["dotnet", "integraCs.dll"]
