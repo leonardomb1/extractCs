@@ -27,7 +27,7 @@ public class TransferenciaDados : IDisposable
         else {
             root = "/app/";
         } 
-        
+
         var config = new ConfigParser(Path.Combine(root, "config.ini"), new ConfigParserSettings 
             {
                 MultiLineValues = 
@@ -159,6 +159,7 @@ public class TransferenciaDados : IDisposable
             ConnectionString = conStr,
         };
         await connection.OpenAsync();
+        await connection.ChangeDatabaseAsync("DW_EXTRACT");
 
         int? linhas = await ContaLinhas($"{sistema}_{NomeTab}", _connectionStringDW);
 
@@ -277,6 +278,7 @@ public class TransferenciaDados : IDisposable
     {
         using SqlConnection updater = new(conStr);
         await updater.OpenAsync();
+        await updater.ChangeDatabaseAsync("DW_CONTROLLER");
         using SqlCommand update = new() {
             CommandText = 
                 $@"
@@ -295,8 +297,9 @@ public class TransferenciaDados : IDisposable
 
     private static int InitExec(string conStr, int agenda)
     {
-        using SqlConnection connection = new(conStr);  
+        using SqlConnection connection = new(conStr);
         connection.Open();  
+        connection.ChangeDatabase("DW_CONTROLLER");  
         using SqlCommand execState = new() {
             CommandText = 
                 @$"
@@ -315,12 +318,13 @@ public class TransferenciaDados : IDisposable
         return exec;
     }
 
-    private static DataTable Buscador(string consulta, string conStr, string? sistema = null, string? Tipo = null, string? NomeTab = null, int? ValorIncremental = null, string? NomeCol = null)
+    private static DataTable Buscador(string consulta, string conStr, string database = "DW_CONTROLLER", string? sistema = null, string? Tipo = null, string? NomeTab = null, int? ValorIncremental = null, string? NomeCol = null)
     {
         using SqlConnection connection = new() {
             ConnectionString = conStr,
         };
         connection.Open();
+        connection.ChangeDatabase(database);
         SqlCommand comando = new(consulta, connection);
         DataTable dados = new() { TableName = $"{sistema}_{NomeTab}" };
 
@@ -356,6 +360,7 @@ public class TransferenciaDados : IDisposable
             ConnectionString = conStr
         };
         connection.Open();
+        connection.ChangeDatabase("DW_EXTRACT");
 
         using SqlBulkCopy bulkCopy = new(connection, SqlBulkCopyOptions.TableLock | SqlBulkCopyOptions.UseInternalTransaction, null);
         bulkCopy.BulkCopyTimeout = 1000;
@@ -371,6 +376,7 @@ public class TransferenciaDados : IDisposable
             ConnectionString = conStr
         };
         connection.Open();
+        connection.ChangeDatabase("DW_EXTRACT");
         using SqlCommand commandCont = new($"SELECT COUNT(1) FROM {sistema}_{retorno.Field<string>("NM_TABELA")} WITH(NOLOCK);", connection);
         commandCont.CommandTimeout = 100;
         var exec = commandCont.ExecuteScalar();
@@ -405,6 +411,7 @@ public class TransferenciaDados : IDisposable
             ConnectionString = conStr
         };
         await connection.OpenAsync();
+        await connection.ChangeDatabaseAsync("DW_CONTROLLER");
         Console.WriteLine(logging);
         SqlCommand log = new() {
             Connection = connection,
@@ -424,6 +431,7 @@ public class TransferenciaDados : IDisposable
     {
         using SqlConnection connection = new(conStr);
         await connection.OpenAsync();
+        await connection.ChangeDatabaseAsync("DW_CONTROLLER");
 
         using SqlCommand command = new($"SELECT COUNT(1) FROM {NomeTab} WITH(NOLOCK);", connection);
         command.CommandTimeout = 100;
