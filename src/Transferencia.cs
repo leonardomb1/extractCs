@@ -1,8 +1,21 @@
+using System.Collections;
 using System.Data;
 using Microsoft.Data.SqlClient;
 
 namespace IntegraCs;
+public class ConsultaInfo
+{
+    public string ConsultaTipo { get; set; }
+    public int SistemaTipo { get; set; }
+    public string Consulta { get; set; }
 
+    public ConsultaInfo(int systemType, string queryType, string query)
+    {
+        ConsultaTipo = queryType;
+        SistemaTipo = systemType;
+        Consulta = query;
+    }
+}
 public class TransferenciaDados : IDisposable
 {
     private const string TOTAL = "T";
@@ -41,8 +54,20 @@ public class TransferenciaDados : IDisposable
     {
         List<DataRow> listaExec = [];
         List<Task> tarefas = [];
-
+        List<ConsultaInfo> queries = [];
         DataTable consultas = Buscador(@$"SELECT * FROM DW_CONSULTA", _connectionStringDW);
+
+        foreach (DataRow lin in consultas.Rows)
+        {
+            queries.Add(
+                new ConsultaInfo(
+                    lin.Field<int>("ID_DW_SISTEMA"),
+                    lin.Field<string>("TP_CONSULTA") ?? "N/A",
+                    lin.Field<string>("DS_CONSULTA") ?? "N/A"
+                )
+            );
+        }
+
         int exec = InitExec(_connectionStringDW, agenda);
 
         try
@@ -50,30 +75,27 @@ public class TransferenciaDados : IDisposable
             await LogOperation(exec, Operador.BUSCA_AGENDA, "Resgatando Lista de Extração...", _connectionStringDW);
             listaExec = BuscaAgenda(agenda, _connectionStringDW);
 
-            await LogOperation(exec, Operador.ITERAR, "Començando Extração...", _connectionStringDW);
+            await LogOperation(exec, Operador.ITERAR, "Começando Extração...", _connectionStringDW);
+            foreach(DataRow linhaExec in listaExec)
+            {
 
-            listaExec.ForEach(async linhaExec => {
                 int? corte = linhaExec.Field<int?>("VL_INC_TABELA");
                 string? coluna = linhaExec.Field<string?>("NM_COLUNA");
                 string tabela = linhaExec.Field<string>("NM_TABELA") ?? "";
                 string conStr = linhaExec.Field<string>("DS_CONSTRING") ?? "";  
                 string sistema = linhaExec.Field<string>("NM_SISTEMA") ?? "";
-
-                string consulta =
-                    (
-                        from list in consultas.AsEnumerable()
-                        where 
-                            list.Field<int>("ID_DW_SISTEMA") == linhaExec.Field<int>("ID_DW_SISTEMA") &&
-                            list.Field<string>("TP_CONSULTA") == linhaExec.Field<string>("TP_TABELA")
-                        select list.Field<string>("DS_CONSULTA")
-                    ).FirstOrDefault() ?? "";
-
+                int idSistema =  linhaExec.Field<int>("ID_DW_SISTEMA");
+                string tipoTabela = linhaExec.Field<string>("TP_TABELA") ?? "";
 
                 await LogOperation(exec, Operador.INIC_LIMPA_TABELA, $"Limpando Tabela: {sistema}_{tabela}...", _connectionStringDW);
                 LimpaTabela(linhaExec, _connectionStringDW, sistema);
+                
+                string consulta = queries
+                    .Where(x => x.SistemaTipo == idSistema && x.ConsultaTipo == tipoTabela)
+                    .Select(x => x.ConsultaTipo)
+                    .FirstOrDefault() ?? "N/A";
 
-
-                switch (linhaExec.Field<string>("TP_TABELA"))
+                switch (tipoTabela)
                 {
                     case TOTAL:
                         tarefas.Add(Task.Run(async () => {
@@ -91,7 +113,7 @@ public class TransferenciaDados : IDisposable
                         await LogOperation(exec, Operador.FINAL_LEITURA_PACOTE, $"Erro SQL: Não foi definido tipo de extração, para tabela {tabela}", _connectionStringDW, FALHA);
                         break;
                 }
-            });
+            }
         }
         catch (SqlException ex)
         {
@@ -101,15 +123,10 @@ public class TransferenciaDados : IDisposable
         finally
         {
             await Task.WhenAll(tarefas);
-
+            
             await LogOperation(exec, Operador.FINAL_SQL, "Extração Realizada.", _connectionStringDW);
             Updater(_connectionStringDW, exec, SUCESSO);
 
-            tarefas.ForEach(async tarefa => {
-                await LogOperation(exec, Operador.LIBERA_RECURSO, "Liberando Threads...", _connectionStringDW);
-                tarefa.Dispose();
-            });
-            
             await LogOperation(exec, Operador.LIBERA_RECURSO, "Liberando Recursos...", _connectionStringDW);
             tarefas.Clear();
             listaExec.Clear();
@@ -183,7 +200,7 @@ public class TransferenciaDados : IDisposable
 
         using SqlCommand consultarTabelaTemp = new() {
             Connection = connection,
-            CommandText = $"SELECT *, GETDATE(), GETDATE() FROM ##T_{NomeTab}_DW_SEL WITH(NOLOCK);",
+            CommandText = $"SELECT *, GETDATE() FROM ##T_{NomeTab}_DW_SEL WITH(NOLOCK);",
             CommandTimeout = 6000
         };
 
@@ -196,7 +213,7 @@ public class TransferenciaDados : IDisposable
         DataTable pacote = new() { TableName = $"{sistema}_{NomeTab}" };
         await LogOperation(exec, Operador.INIC_SQL, $"Iniciando consulta da tabela: {NomeTab}...", _connectionStringDW);
         
-        using SqlDataReader reader = await consultarTabelaTemp.ExecuteReaderAsync();
+        using SqlDataReader reader = consultarTabelaTemp.ExecuteReader();
         
         try
         {
@@ -246,12 +263,11 @@ public class TransferenciaDados : IDisposable
 
         await LogOperation(exec, Operador.INIC_SQL, $"Deletando tabela temporaria: ##T_{NomeTab}_DW_SEL...", _connectionStringDW);
         pacote.Dispose();
-        await deletarTabelaTemp.ExecuteNonQueryAsync();
-        
-        
-        await reader.DisposeAsync();
-        await connection.CloseAsync();
-        await connection.DisposeAsync();
+        reader.Dispose();
+
+        deletarTabelaTemp.ExecuteNonQuery();
+        connection.Close();
+        connection.Dispose();
     }
 
     private static void Updater(string conStr, int numExec, int status)
