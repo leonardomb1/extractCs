@@ -13,7 +13,7 @@ public class Program
             Console.WriteLine("Não Configurado."); 
             throw new Exception("Não Configurado!");
         }
-        _tamPacote = int.Parse(configDW); 
+        _tamPacote = int.Parse(configPacote); 
         _connectionStringDW = configDW; 
     }
     public void Run()
