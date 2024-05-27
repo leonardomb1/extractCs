@@ -72,12 +72,14 @@ public class TransferenciaDados : IDisposable
             listaExec = BuscaAgenda(agenda, _connectionStringDW);
 
             await LogOperation(exec, Operador.ITERAR, "Començando Extração...", _connectionStringDW);
+
             listaExec.ForEach(async linhaExec => {
                 int? corte = linhaExec.Field<int?>("VL_INC_TABELA");
                 string? coluna = linhaExec.Field<string?>("NM_COLUNA");
                 string tabela = linhaExec.Field<string>("NM_TABELA") ?? "";
                 string conStr = linhaExec.Field<string>("DS_CONSTRING") ?? "";  
                 string sistema = linhaExec.Field<string>("NM_SISTEMA") ?? "";
+
                 string consulta =
                     (
                         from list in consultas.AsEnumerable()
@@ -96,13 +98,13 @@ public class TransferenciaDados : IDisposable
                 {
                     case TOTAL:
                         tarefas.Add(Task.Run(async () => {
-                            await BuscadorPacotes(exec, TOTAL, sistema, consulta, conStr, tabela);
+                            await BuscadorPacotes(exec, TOTAL, sistema, conStr, consulta, tabela);
                             await LogOperation(exec, Operador.FINAL_LEITURA_PACOTE, $"Concluído extração para: {tabela}", _connectionStringDW);
                         }));
                         break;
                     case INCREMENTAL:
                         tarefas.Add(Task.Run(async () => {
-                            await BuscadorPacotes(exec, INCREMENTAL, sistema, consulta, conStr, tabela, corte, coluna);
+                            await BuscadorPacotes(exec, INCREMENTAL, sistema, conStr, consulta, tabela, corte, coluna);
                             await LogOperation(exec ,Operador.FINAL_LEITURA_PACOTE, $"Concluído extração para: {tabela}", _connectionStringDW);
                         }));
                         break;
@@ -110,6 +112,7 @@ public class TransferenciaDados : IDisposable
                         await LogOperation(exec, Operador.FINAL_LEITURA_PACOTE, $"Erro SQL: Não foi definido tipo de extração, para tabela {tabela}", _connectionStringDW, FALHA);
                         break;
                 }
+                await Task.WhenAll(tarefas);
             });
         }
         catch (SqlException ex)
@@ -119,7 +122,6 @@ public class TransferenciaDados : IDisposable
         }
         finally
         {
-            await Task.WhenAll(tarefas);
 
             await LogOperation(exec, Operador.FINAL_SQL, "Extração Realizada.", _connectionStringDW);
             Updater(_connectionStringDW, exec, SUCESSO);
@@ -158,10 +160,9 @@ public class TransferenciaDados : IDisposable
         using SqlConnection connection = new() {
             ConnectionString = conStr,
         };
-        await connection.OpenAsync();
-        await connection.ChangeDatabaseAsync("DW_EXTRACT");
+        connection.Open();
 
-        int? linhas = await ContaLinhas($"{sistema}_{NomeTab}", _connectionStringDW);
+        int? linhas = ContaLinhas($"{sistema}_{NomeTab}", _connectionStringDW);
 
         try
         {
@@ -428,18 +429,18 @@ public class TransferenciaDados : IDisposable
         await log.DisposeAsync();
     }
 
-    private static async Task<int?> ContaLinhas(string NomeTab, string conStr)
+    private static int? ContaLinhas(string NomeTab, string conStr)
     {
         using SqlConnection connection = new(conStr);
-        await connection.OpenAsync();
-        await connection.ChangeDatabaseAsync("DW_CONTROLLER");
+        connection.Open();
+        connection.ChangeDatabase("DW_EXTRACT");
 
         using SqlCommand command = new($"SELECT COUNT(1) FROM {NomeTab} WITH(NOLOCK);", connection);
         command.CommandTimeout = 100;
         var exec = command.ExecuteScalar();
 
         int? count = Convert.ToInt32(exec == DBNull.Value ? 0 : exec);
-        await connection.CloseAsync();
+        connection.CloseAsync();
         return count;
     }
 }

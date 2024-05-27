@@ -24,6 +24,7 @@ public class Agenda
         Console.WriteLine("Resgantando agendas de execucao...");
         using SqlConnection connection = new(_con);
         connection.Open();
+        connection.ChangeDatabase("DW_CONTROLLER");
 
         using SqlCommand command = new("SELECT * FROM DW_AGENDADOR", connection);
         SqlDataAdapter adapter = new(command);

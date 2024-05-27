@@ -2,3 +2,4 @@
 **/.vscode
 **/obj
 *app.config
+*.env
