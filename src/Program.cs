@@ -2,8 +2,8 @@
 
 public class Program
 {
-    public static string _connectionStringDW = "";
-    public static int _tamPacote = 0;
+    private string _connectionStringDW;
+    private int _tamPacote;
     public Program()
     {
         var configPacote = Environment.GetEnvironmentVariable("PACKET_SIZE") ?? "n/a";
@@ -16,9 +16,14 @@ public class Program
         _tamPacote = int.Parse(configDW); 
         _connectionStringDW = configDW; 
     }
-    public static void Main()
-    {       
+    public void Run()
+    {
         Agenda agenda = new();
-        agenda.Agendador();
+        agenda.Agendador(_connectionStringDW, _tamPacote);
+    }
+    public static void Main()
+    {  
+        Program runnable = new();
+        runnable.Run();
     }
 }

@@ -13,10 +13,10 @@ public class AgendaInfo
 
 public class Agenda
 {
-    private DataTable GetAgenda()
+    private DataTable GetAgenda(string destinationConnectionString)
     {
         Console.WriteLine("Resgantando agendas de execucao...");
-        using SqlConnection connection = new(Program._connectionStringDW);
+        using SqlConnection connection = new(destinationConnectionString);
         connection.Open();
         connection.ChangeDatabase("DW_CONTROLLER");
 
@@ -29,9 +29,9 @@ public class Agenda
         return tabela;
     }
 
-    public void Agendador()
+    public void Agendador(string destinationConnectionString, int packetSize)
     {
-        DataTable agenda = GetAgenda();
+        DataTable agenda = GetAgenda(destinationConnectionString);
         Dictionary<int, AgendaInfo> agendas = [];
 
         Console.WriteLine("Instanciando agenciador...");
@@ -47,7 +47,7 @@ public class Agenda
                 {
                     if (agendas[id].IsRunning) return;
 
-                    TransferenciaDados dados = new();
+                    TransferenciaDados dados = new(destinationConnectionString, packetSize);
                     Console.WriteLine($"Executando agenda: {row.Field<string>("NM_AGENDA")}...");
                     agendas[id].IsRunning = true;
                     await dados.Transferir(id);
