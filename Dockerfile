@@ -23,8 +23,6 @@ WORKDIR /app
 
 COPY --from=publish /app/publish .
 
-COPY ["consulta_incremental.sql", "./"]
-COPY ["consulta_total.sql", "./"]
 COPY ["config.ini", "./"]
 
 ENTRYPOINT ["dotnet", "integraCs.dll"]
