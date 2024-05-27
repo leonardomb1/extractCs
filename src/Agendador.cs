@@ -1,4 +1,3 @@
-using System.Configuration;
 using System.Data;
 using System.Reactive.Linq;
 using Microsoft.Data.SqlClient;
@@ -14,15 +13,10 @@ public class AgendaInfo
 
 public class Agenda
 {
-    private string _con;
-    public Agenda()
-    {
-        _con = ConfigurationManager.ConnectionStrings["DataWarehouse"].ConnectionString;
-    }
     private DataTable GetAgenda()
     {
         Console.WriteLine("Resgantando agendas de execucao...");
-        using SqlConnection connection = new(_con);
+        using SqlConnection connection = new(Program._connectionStringDW);
         connection.Open();
         connection.ChangeDatabase("DW_CONTROLLER");
 
