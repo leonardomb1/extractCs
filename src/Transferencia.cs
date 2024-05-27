@@ -91,7 +91,6 @@ public class TransferenciaDados : IDisposable
                         await LogOperation(exec, Operador.FINAL_LEITURA_PACOTE, $"Erro SQL: Não foi definido tipo de extração, para tabela {tabela}", _connectionStringDW, FALHA);
                         break;
                 }
-                await Task.WhenAll(tarefas);
             });
         }
         catch (SqlException ex)
@@ -101,6 +100,7 @@ public class TransferenciaDados : IDisposable
         }
         finally
         {
+            await Task.WhenAll(tarefas);
 
             await LogOperation(exec, Operador.FINAL_SQL, "Extração Realizada.", _connectionStringDW);
             Updater(_connectionStringDW, exec, SUCESSO);
