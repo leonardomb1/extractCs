@@ -68,7 +68,7 @@ public class TransferenciaDados : IDisposable
 
         try
         {
-            await LogOperation(exec, Operador.BUSCA_AGENDA, "Resgatando Lista de Extração...'", _connectionStringDW);
+            await LogOperation(exec, Operador.BUSCA_AGENDA, "Resgatando Lista de Extração...", _connectionStringDW);
             listaExec = BuscaAgenda(agenda, _connectionStringDW);
 
             await LogOperation(exec, Operador.ITERAR, "Començando Extração...", _connectionStringDW);
@@ -83,7 +83,7 @@ public class TransferenciaDados : IDisposable
                         from list in consultas.AsEnumerable()
                         where 
                             list.Field<int>("ID_DW_SISTEMA") == linhaExec.Field<int>("ID_DW_SISTEMA") &&
-                            list.Field<string>("TP_TABELA") == linhaExec.Field<string>("TP_TABELA")
+                            list.Field<string>("TP_CONSULTA") == linhaExec.Field<string>("TP_TABELA")
                         select list.Field<string>("DS_CONSULTA")
                     ).FirstOrDefault() ?? "";
 
@@ -115,14 +115,14 @@ public class TransferenciaDados : IDisposable
         catch (SqlException ex)
         {
             await LogOperation(exec ,Operador.ERRO_SQL, $"Erro de Geral de SQL: {ex}", _connectionStringDW, FALHA);
-            await Updater(_connectionStringDW, exec, FALHA);
+            Updater(_connectionStringDW, exec, FALHA);
         }
         finally
         {
             await Task.WhenAll(tarefas);
 
             await LogOperation(exec, Operador.FINAL_SQL, "Extração Realizada.", _connectionStringDW);
-            await Updater(_connectionStringDW, exec, SUCESSO);
+            Updater(_connectionStringDW, exec, SUCESSO);
 
             tarefas.ForEach(async tarefa => {
                 await LogOperation(exec, Operador.LIBERA_RECURSO, "Liberando Threads...", _connectionStringDW);
@@ -140,7 +140,7 @@ public class TransferenciaDados : IDisposable
         DataTable retorno = Buscador(
             @$" SELECT 
                     *
-                FROM PROTH_EXTLIST AS LIS WITH(NOLOCK)
+                FROM DW_EXTLIST AS LIS WITH(NOLOCK)
                 INNER JOIN DW_SISTEMAS AS SIS WITH(NOLOCK)
                     ON  SIS.ID_DW_SISTEMA = LIS.ID_DW_SISTEMA;", conStr
             );
@@ -274,22 +274,23 @@ public class TransferenciaDados : IDisposable
         await connection.DisposeAsync();
     }
 
-    private static async Task Updater(string conStr, int numExec, int status)
+    private static void Updater(string conStr, int numExec, int status)
     {
         using SqlConnection updater = new(conStr);
-        await updater.OpenAsync();
-        await updater.ChangeDatabaseAsync("DW_CONTROLLER");
+        updater.Open();
+        updater.ChangeDatabase("DW_CONTROLLER");
         using SqlCommand update = new() {
             CommandText = 
                 $@"
                     UPDATE DW_EXECUCAO SET VF_STATUS = {status} 
                     WHERE ID_DW_EXECUCAO = {numExec};
 
-                    UPDATE DW_EXECUCAO SET DT_FIM_EXEC = GETDATE()
+                    UPDATE DW_EXECUCAO SET DT_FIM_EXEC = GETDATE() AT TIME ZONE 'UTC' AT TIME ZONE 'Atlantic Standard Time'
                     WHERE ID_DW_EXECUCAO = {numExec};
-                "
+                ",
+                Connection = updater
         };
-        await update.ExecuteNonQueryAsync();
+        update.ExecuteNonQuery();
         updater.Close();
         update.Dispose();
         updater.Dispose();
