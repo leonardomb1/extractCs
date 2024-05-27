@@ -1,6 +1,7 @@
 using System.Configuration;
 using System.Data;
 using System.Globalization;
+using System.Runtime.InteropServices;
 using Microsoft.Data.SqlClient;
 using Salaros.Configuration;
 
@@ -9,20 +10,25 @@ namespace IntegraCs;
 
 public class TransferenciaDados : IDisposable
 {
-    private const string PROTHEUS_TOTAL = "T";
-    private const string PROTHEUS_INC = "I";
+    private const string TOTAL = "T";
+    private const string INCREMENTAL = "I";
     private const int SUCESSO = 1;
     private const int FALHA = 0;
-    private string _connectionStringOrigin ;
-    private string _connectionStringDestination;
-    private string _consultaTotal;
+    private string _connectionStringDW;
     private int _tamPacote;
-    private string _consultaIncremental;
     private bool disposed = false;
 
     public TransferenciaDados()
     {
-        var config = new ConfigParser("/app/config.ini", new ConfigParserSettings 
+        string root;
+        if(RuntimeInformation.IsOSPlatform(OSPlatform.Windows)) { 
+            root = @".\app\"; 
+        }
+        else {
+            root = "/app/";
+        } 
+        
+        var config = new ConfigParser(Path.Combine(root, "config.ini"), new ConfigParserSettings 
             {
                 MultiLineValues = 
                     MultiLineValues.Simple | 
@@ -30,10 +36,7 @@ public class TransferenciaDados : IDisposable
                     MultiLineValues.QuoteDelimitedValues, Culture = new CultureInfo("en-US")
             });
         _tamPacote = int.Parse(config.GetValue("Packet", "pacoteSql"));
-        _connectionStringOrigin = ConfigurationManager.ConnectionStrings["Protheus"].ConnectionString;
-        _connectionStringDestination = ConfigurationManager.ConnectionStrings["DataWarehouse"].ConnectionString;
-        _consultaTotal = File.ReadAllText("/app/consulta_total.sql");
-        _consultaIncremental = File.ReadAllText("/app/consulta_incremental.sql");
+        _connectionStringDW = ConfigurationManager.ConnectionStrings["DataWarehouse"].ConnectionString;
     }
 
     public void Dispose()
@@ -55,102 +58,91 @@ public class TransferenciaDados : IDisposable
         Dispose(disposing: false);
     }
 
-
     public async Task Transferir(int agenda)
     {
         List<DataRow> listaExec = [];
-        SqlConnection connectionLk = new(_connectionStringDestination);
         List<Task> tarefas = [];
 
-        int exec = InitExec(_connectionStringDestination, agenda);
+        DataTable consultas = Buscador(@$"SELECT * FROM DW_CONSULTA", _connectionStringDW);
+        int exec = InitExec(_connectionStringDW, agenda);
 
         try
         {
-            listaExec = BuscaAgenda(agenda, _connectionStringDestination);
-            await LogOperation(exec, Operador.BUSCA_AGENDA, "Resgatado Agendas.", _connectionStringDestination, SUCESSO);
- 
-            connectionLk.Open();
-            foreach (DataRow row in listaExec)
-            {
-                await LogOperation(exec, Operador.INIC_LIMPA_TABELA, $"Limpando Tabela: PROTH_{row.Field<string>("NM_TABELA")}...", _connectionStringDestination, SUCESSO);
-                LimpaTabela(row, connectionLk);
-            }
-            connectionLk.Close();
-            
-            await LogOperation(exec, Operador.ITERAR, "Començando Extração...", _connectionStringDestination, SUCESSO);
-            foreach(DataRow linhaExec in listaExec)
-            {
-                string tabela = linhaExec.Field<string>("NM_TABELA") ?? "";
-                string? coluna = linhaExec.Field<string?>("NM_COLUNA");
-                int? corte = linhaExec.Field<int?>("VL_INC_TABELA");
+            await LogOperation(exec, Operador.BUSCA_AGENDA, "Resgatando Lista de Extração...'", _connectionStringDW);
+            listaExec = BuscaAgenda(agenda, _connectionStringDW);
 
-                await LogOperation(exec, Operador.ENTRAR_VERIF_LOG, "Verificando tipo de extração...", _connectionStringDestination, SUCESSO);
+            await LogOperation(exec, Operador.ITERAR, "Començando Extração...", _connectionStringDW);
+            listaExec.ForEach(async linhaExec => {
+                int? corte = linhaExec.Field<int?>("VL_INC_TABELA");
+                string? coluna = linhaExec.Field<string?>("NM_COLUNA");
+                string tabela = linhaExec.Field<string>("NM_TABELA") ?? "";
+                string conStr = linhaExec.Field<string>("DS_CONSTRING") ?? "";  
+                string sistema = linhaExec.Field<string>("NM_SISTEMA") ?? "";
+                string consulta =
+                    (
+                        from list in consultas.AsEnumerable()
+                        where 
+                            list.Field<int>("ID_DW_SISTEMA") == linhaExec.Field<int>("ID_DW_SISTEMA") &&
+                            list.Field<string>("TP_TABELA") == linhaExec.Field<string>("TP_TABELA")
+                        select list.Field<string>("DS_CONSULTA")
+                    ).FirstOrDefault() ?? "";
+
+
+                await LogOperation(exec, Operador.INIC_LIMPA_TABELA, $"Limpando Tabela: {sistema}_{tabela}...", _connectionStringDW);
+                LimpaTabela(linhaExec, _connectionStringDW, sistema);
+
+
                 switch (linhaExec.Field<string>("TP_TABELA"))
                 {
-                    case PROTHEUS_TOTAL:
+                    case TOTAL:
                         tarefas.Add(Task.Run(async () => {
-                            try
-                            {
-                                await BuscadorPacotes(exec, PROTHEUS_TOTAL, tabela);
-                                await LogOperation(exec, Operador.FINAL_LEITURA_PACOTE, $"Concluído extração para: {tabela}", _connectionStringDestination, SUCESSO);
-                            }
-                            catch (SqlException ex)
-                            {
-                                await LogOperation(exec, Operador.ERRO_SQL, $"Erro SQL: {ex} na tabela {tabela}", _connectionStringDestination, FALHA);
-                            } 
+                            await BuscadorPacotes(exec, TOTAL, sistema, consulta, conStr, tabela);
+                            await LogOperation(exec, Operador.FINAL_LEITURA_PACOTE, $"Concluído extração para: {tabela}", _connectionStringDW);
                         }));
                         break;
-                    case PROTHEUS_INC:
+                    case INCREMENTAL:
                         tarefas.Add(Task.Run(async () => {
-                            try 
-                            {
-                                await BuscadorPacotes(exec, PROTHEUS_INC, tabela, corte, coluna);
-                                await LogOperation(exec ,Operador.FINAL_LEITURA_PACOTE, $"Concluído extração para: {tabela}", _connectionStringDestination, SUCESSO);
-                            }
-                            catch (SqlException ex)
-                            {
-                                await LogOperation(exec ,Operador.ERRO_SQL, $"Erro SQL: {ex} na tabela {tabela}", _connectionStringDestination, FALHA);
-                            }
+                            await BuscadorPacotes(exec, INCREMENTAL, sistema, consulta, conStr, tabela, corte, coluna);
+                            await LogOperation(exec ,Operador.FINAL_LEITURA_PACOTE, $"Concluído extração para: {tabela}", _connectionStringDW);
                         }));
                         break;
                     default:
-                        await LogOperation(exec, Operador.FINAL_LEITURA_PACOTE, $"Erro SQL: Não foi definido tipo de extração, para tabela {tabela}", _connectionStringDestination, FALHA);
+                        await LogOperation(exec, Operador.FINAL_LEITURA_PACOTE, $"Erro SQL: Não foi definido tipo de extração, para tabela {tabela}", _connectionStringDW, FALHA);
                         break;
                 }
-            }
-            
-            await Task.WhenAll(tarefas);
-            await Updater(_connectionStringDestination, exec, SUCESSO);
+            });
         }
         catch (SqlException ex)
         {
-            await LogOperation(exec ,Operador.ERRO_SQL, $"Erro de Geral de SQL: {ex}", _connectionStringDestination, FALHA);
-            await Updater(_connectionStringDestination, exec, FALHA);
+            await LogOperation(exec ,Operador.ERRO_SQL, $"Erro de Geral de SQL: {ex}", _connectionStringDW, FALHA);
+            await Updater(_connectionStringDW, exec, FALHA);
         }
         finally
         {
-            foreach(Task tarefa in tarefas)
-            {
-                await LogOperation(exec, Operador.LIBERA_RECURSO, "Liberando Threads...", _connectionStringDestination, SUCESSO);
+            await Task.WhenAll(tarefas);
+
+            await LogOperation(exec, Operador.FINAL_SQL, "Extração Realizada.", _connectionStringDW);
+            await Updater(_connectionStringDW, exec, SUCESSO);
+
+            tarefas.ForEach(async tarefa => {
+                await LogOperation(exec, Operador.LIBERA_RECURSO, "Liberando Threads...", _connectionStringDW);
                 tarefa.Dispose();
-            }
+            });
             
-            await LogOperation(exec, Operador.LIBERA_RECURSO, "Liberando Conexão e Recursos...", _connectionStringDestination, SUCESSO);
+            await LogOperation(exec, Operador.LIBERA_RECURSO, "Liberando Recursos...", _connectionStringDW);
             tarefas.Clear();
             listaExec.Clear();
-            connectionLk.Dispose();
-            await Task.CompletedTask;
         }
     }
 
-    private static List<DataRow> BuscaAgenda(int agenda, string conStr) {
+    private static List<DataRow> BuscaAgenda(int agenda, string conStr) 
+    {
         DataTable retorno = Buscador(
             @$" SELECT 
-                    LIS.*, 
-                    AG.VL_RECORRENCIA 
+                    *
                 FROM PROTH_EXTLIST AS LIS WITH(NOLOCK)
-                INNER JOIN DW_AGENDADOR AS AG WITH(NOLOCK)
-                    ON AG.ID_DW_AGENDADOR = LIS.ID_DW_AGENDADOR", conStr
+                INNER JOIN DW_SISTEMAS AS SIS WITH(NOLOCK)
+                    ON  SIS.ID_DW_SISTEMA = LIS.ID_DW_SISTEMA;", conStr
             );
         
         var result = 
@@ -161,42 +153,42 @@ public class TransferenciaDados : IDisposable
         return result.ToList();
     }
 
-    private async Task BuscadorPacotes(int exec, string Tipo, string? NomeTab = null, int? ValorIncremental = null, string? NomeCol = null)
+    private async Task BuscadorPacotes(int exec, string Tipo, string sistema, string conStr, string consulta, string? NomeTab = null, int? ValorIncremental = null, string? NomeCol = null)
     {     
         using SqlConnection connection = new() {
-            ConnectionString = _connectionStringOrigin,
+            ConnectionString = conStr,
         };
         await connection.OpenAsync();
 
-        int? linhas = await ContaLinhas($"PROTH_{NomeTab}", _connectionStringDestination);
+        int? linhas = await ContaLinhas($"{sistema}_{NomeTab}", _connectionStringDW);
 
         try
         {
-            await LogOperation(exec, Operador.INIC_SQL, $"Criando tabela temporaria: ##T_{NomeTab}_DW_SEL...", _connectionStringDestination, SUCESSO);
+            await LogOperation(exec, Operador.INIC_SQL, $"Criando tabela temporaria: ##T_{NomeTab}_DW_SEL...", _connectionStringDW);
             using SqlCommand criarTabelaTemp = new() {
                 Connection = connection
             };
             switch ((linhas, Tipo))
             {
-                case (_, PROTHEUS_TOTAL):
-                    await LogOperation(exec, Operador.ABRIR_CONEXAO, $"Conexão aberta para extração do tipo Total da tabela: {NomeTab}...", _connectionStringDestination, SUCESSO);
-                    criarTabelaTemp.CommandText = _consultaTotal;
-                    criarTabelaTemp.Parameters.AddWithValue("@TABELA_PROTHEUS", NomeTab);
+                case (_, TOTAL):
+                    await LogOperation(exec, Operador.ABRIR_CONEXAO, $"Conexão aberta para extração do tipo Total da tabela: {NomeTab}...", _connectionStringDW);
+                    criarTabelaTemp.CommandText = consulta;
+                    criarTabelaTemp.Parameters.AddWithValue("@TABELA", NomeTab);
                     break;
-                case (0, PROTHEUS_INC):
-                    await LogOperation(exec, Operador.ABRIR_CONEXAO, $"Conexão aberta para extração do tipo Total da tabela: {NomeTab}...", _connectionStringDestination, SUCESSO);
-                    criarTabelaTemp.CommandText = _consultaTotal;
-                    criarTabelaTemp.Parameters.AddWithValue("@TABELA_PROTHEUS", NomeTab);
+                case (0, INCREMENTAL):
+                    await LogOperation(exec, Operador.ABRIR_CONEXAO, $"Conexão aberta para extração do tipo Total da tabela: {NomeTab}...", _connectionStringDW);
+                    criarTabelaTemp.CommandText = consulta;
+                    criarTabelaTemp.Parameters.AddWithValue("@TABELA", NomeTab);
                     break;
-                case (> 0, PROTHEUS_INC):
-                    await LogOperation(exec, Operador.ABRIR_CONEXAO, $"Conexão aberta para extração do tipo Incremental da tabela: {NomeTab}...", _connectionStringDestination, SUCESSO);
-                    criarTabelaTemp.CommandText = _consultaIncremental;
-                    criarTabelaTemp.Parameters.AddWithValue("@TABELA_PROTHEUS", NomeTab);
+                case (> 0, INCREMENTAL):
+                    await LogOperation(exec, Operador.ABRIR_CONEXAO, $"Conexão aberta para extração do tipo Incremental da tabela: {NomeTab}...", _connectionStringDW);
+                    criarTabelaTemp.CommandText = consulta;
+                    criarTabelaTemp.Parameters.AddWithValue("@TABELA", NomeTab);
                     criarTabelaTemp.Parameters.AddWithValue("@VL_CORTE", ValorIncremental.ToString());
                     criarTabelaTemp.Parameters.AddWithValue("@COL_DT", NomeCol);
                     break;
                 default:
-                    await LogOperation(exec, Operador.ABRIR_CONEXAO, $"Conexão Aberta, mas sem tipo definido para a tabela: {NomeTab}...", _connectionStringDestination, FALHA);
+                    await LogOperation(exec, Operador.ABRIR_CONEXAO, $"Conexão Aberta, mas sem tipo definido para a tabela: {NomeTab}...", _connectionStringDW, FALHA);
                     break;
             }
             criarTabelaTemp.CommandTimeout = 1000;
@@ -204,7 +196,7 @@ public class TransferenciaDados : IDisposable
         }
         catch (SqlException ex)
         {
-            await LogOperation(exec, Operador.ERRO_SQL, $"Erro SQL: {ex} na tabela {NomeTab} ao tentar criar tabela temporária.", _connectionStringDestination, FALHA);
+            await LogOperation(exec, Operador.ERRO_SQL, $"Erro SQL: {ex} na tabela {NomeTab} ao tentar criar tabela temporária.", _connectionStringDW, FALHA);
         }
 
 
@@ -220,8 +212,8 @@ public class TransferenciaDados : IDisposable
             CommandTimeout = 100
         };
 
-        DataTable pacote = new() { TableName = $"PROTH_{NomeTab}" };
-        await LogOperation(exec, Operador.INIC_SQL, $"Iniciando consulta da tabela: {NomeTab}...", _connectionStringDestination, SUCESSO);
+        DataTable pacote = new() { TableName = $"{sistema}_{NomeTab}" };
+        await LogOperation(exec, Operador.INIC_SQL, $"Iniciando consulta da tabela: {NomeTab}...", _connectionStringDW);
         
         using SqlDataReader reader = await consultarTabelaTemp.ExecuteReaderAsync();
         
@@ -243,25 +235,25 @@ public class TransferenciaDados : IDisposable
 
                 if (pacote.Rows.Count >= _tamPacote)
                 {
-                    await LogOperation(exec, Operador.INIC_INSERT_BULK, $"Iniciando BULK Insert da tabela: {NomeTab} com {pacote.Rows.Count} Linhas.", _connectionStringDestination, SUCESSO);
-                    InserirDadosBulk(pacote, _connectionStringDestination);
+                    await LogOperation(exec, Operador.INIC_INSERT_BULK, $"Iniciando BULK Insert da tabela: {NomeTab} com {pacote.Rows.Count} Linhas.", _connectionStringDW);
+                    InserirDadosBulk(pacote, _connectionStringDW);
                     pacote.Clear();
-                    await LogOperation(exec, Operador.INIC_INSERT_BULK, $"Finalizado BULK Insert da tabela: {NomeTab}", _connectionStringDestination, SUCESSO);
+                    await LogOperation(exec, Operador.INIC_INSERT_BULK, $"Finalizado BULK Insert da tabela: {NomeTab}", _connectionStringDW);
                 }
             }
 
             if (pacote.Rows.Count > 0)
             {
-                await LogOperation(exec, Operador.INIC_INSERT_BULK, $"Iniciando BULK Insert da tabela: {NomeTab} com {pacote.Rows.Count}", _connectionStringDestination, SUCESSO);
-                InserirDadosBulk(pacote, _connectionStringDestination);
-                await LogOperation(exec, Operador.INIC_INSERT_BULK, $"Finalizado BULK Insert da tabela: {NomeTab}", _connectionStringDestination, SUCESSO);
+                await LogOperation(exec, Operador.INIC_INSERT_BULK, $"Iniciando BULK Insert da tabela: {NomeTab} com {pacote.Rows.Count}", _connectionStringDW);
+                InserirDadosBulk(pacote, _connectionStringDW);
+                await LogOperation(exec, Operador.INIC_INSERT_BULK, $"Finalizado BULK Insert da tabela: {NomeTab}", _connectionStringDW);
             }
 
 
         }
         catch (SqlException ex)
         {
-            await LogOperation(exec, Operador.ERRO_SQL, $"Erro SQL: {ex} na tabela {NomeTab} ao tentar executar inserção de dados", _connectionStringDestination, FALHA);
+            await LogOperation(exec, Operador.ERRO_SQL, $"Erro SQL: {ex} na tabela {NomeTab} ao tentar executar inserção de dados", _connectionStringDW, FALHA);
         }
         finally
         {
@@ -271,10 +263,12 @@ public class TransferenciaDados : IDisposable
             }
         }
 
+        await LogOperation(exec, Operador.INIC_SQL, $"Deletando tabela temporaria: ##T_{NomeTab}_DW_SEL...", _connectionStringDW);
         pacote.Dispose();
-        await LogOperation(exec, Operador.INIC_SQL, $"Deletando tabela temporaria: ##T_{NomeTab}_DW_SEL...", _connectionStringDestination, SUCESSO);
-        await reader.DisposeAsync();
         await deletarTabelaTemp.ExecuteNonQueryAsync();
+        
+        
+        await reader.DisposeAsync();
         await connection.CloseAsync();
         await connection.DisposeAsync();
     }
@@ -297,7 +291,7 @@ public class TransferenciaDados : IDisposable
         updater.Close();
         update.Dispose();
         updater.Dispose();
-    } 
+    }
 
     private static int InitExec(string conStr, int agenda)
     {
@@ -321,22 +315,22 @@ public class TransferenciaDados : IDisposable
         return exec;
     }
 
-    private static DataTable Buscador(string consulta, string conStr, string? Tipo = null, string? NomeTab = null, int? ValorIncremental = null, string? NomeCol = null)
+    private static DataTable Buscador(string consulta, string conStr, string? sistema = null, string? Tipo = null, string? NomeTab = null, int? ValorIncremental = null, string? NomeCol = null)
     {
         using SqlConnection connection = new() {
             ConnectionString = conStr,
         };
         connection.Open();
         SqlCommand comando = new(consulta, connection);
-        DataTable dados = new() { TableName = $"PROTH_{NomeTab}" };
+        DataTable dados = new() { TableName = $"{sistema}_{NomeTab}" };
 
         switch (Tipo)
         {
-            case PROTHEUS_TOTAL:
-                comando.Parameters.AddWithValue("@TABELA_PROTHEUS", NomeTab);
+            case TOTAL:
+                comando.Parameters.AddWithValue("@TABELA", NomeTab);
                 break;
-            case PROTHEUS_INC:
-                comando.Parameters.AddWithValue("@TABELA_PROTHEUS", NomeTab);
+            case INCREMENTAL:
+                comando.Parameters.AddWithValue("@TABELA", NomeTab);
                 comando.Parameters.AddWithValue("@VL_CORTE", ValorIncremental.ToString());
                 comando.Parameters.AddWithValue("@COL_DT", NomeCol);
                 break;
@@ -371,9 +365,13 @@ public class TransferenciaDados : IDisposable
         connection.Dispose();
     }
 
-    private static void LimpaTabela(DataRow retorno, SqlConnection connection)
+    private static void LimpaTabela(DataRow retorno, string conStr, string sistema)
     {
-        using SqlCommand commandCont = new($"SELECT COUNT(1) FROM PROTH_{retorno.Field<string>("NM_TABELA")} WITH(NOLOCK);", connection);
+        using SqlConnection connection = new() {
+            ConnectionString = conStr
+        };
+        connection.Open();
+        using SqlCommand commandCont = new($"SELECT COUNT(1) FROM {sistema}_{retorno.Field<string>("NM_TABELA")} WITH(NOLOCK);", connection);
         commandCont.CommandTimeout = 100;
         var exec = commandCont.ExecuteScalar();
 
@@ -383,22 +381,25 @@ public class TransferenciaDados : IDisposable
 
         switch ((linhas, retorno.Field<string>("TP_TABELA")))
         {
-            case (> 0, PROTHEUS_INC):
+            case (> 0, INCREMENTAL):
                 command.CommandText = 
-                    @$" DELETE FROM PROTH_{retorno.Field<string>("NM_TABELA")} 
+                    @$" DELETE FROM {sistema}_{retorno.Field<string>("NM_TABELA")} 
                         WHERE [{retorno.Field<string>("NM_COLUNA")}] >= GETDATE() - {retorno.Field<int>("VL_INC_TABELA")};";
                 command.ExecuteNonQuery();
                 break;
-            case (_, PROTHEUS_TOTAL):
-                command.CommandText = $"TRUNCATE TABLE PROTH_{retorno.Field<string>("NM_TABELA")};";
+            case (_, TOTAL):
+                command.CommandText = $"TRUNCATE TABLE {sistema}_{retorno.Field<string>("NM_TABELA")};";
                 command.ExecuteNonQuery();
                 break;
             default:
                 break;
         }
+
+        connection.Close();
+        connection.Dispose();
     }
 
-    private static async Task LogOperation(int exec, int cdLog, string logging,  string conStr, int sucesso = 0)
+    private static async Task LogOperation(int exec, int cdLog, string logging, string conStr, int sucesso = SUCESSO)
     {
         SqlConnection connection = new() {
             ConnectionString = conStr
