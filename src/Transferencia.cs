@@ -92,7 +92,7 @@ public class TransferenciaDados : IDisposable
                 
                 string consulta = queries
                     .Where(x => x.SistemaTipo == idSistema && x.ConsultaTipo == tipoTabela)
-                    .Select(x => x.ConsultaTipo)
+                    .Select(x => x.Consulta)
                     .FirstOrDefault() ?? "N/A";
 
                 switch (tipoTabela)
