@@ -1,4 +1,3 @@
-using System.Collections;
 using System.Data;
 using Microsoft.Data.SqlClient;
 
@@ -81,38 +80,27 @@ public class TransferenciaDados : IDisposable
 
                 int? corte = linhaExec.Field<int?>("VL_INC_TABELA");
                 string? coluna = linhaExec.Field<string?>("NM_COLUNA");
-                string tabela = linhaExec.Field<string>("NM_TABELA") ?? "";
-                string conStr = linhaExec.Field<string>("DS_CONSTRING") ?? "";  
-                string sistema = linhaExec.Field<string>("NM_SISTEMA") ?? "";
                 int idSistema =  linhaExec.Field<int>("ID_DW_SISTEMA");
-                string tipoTabela = linhaExec.Field<string>("TP_TABELA") ?? "";
+                string tabela = linhaExec.Field<string>("NM_TABELA") ?? "N/A";
+                string conStr = linhaExec.Field<string>("DS_CONSTRING") ?? "N/A";  
+                string sistema = linhaExec.Field<string>("NM_SISTEMA") ?? "N/A";
+                string tipoTabela = linhaExec.Field<string>("TP_TABELA") ?? "N/A";
 
                 await LogOperation(exec, Operador.INIC_LIMPA_TABELA, $"Limpando Tabela: {sistema}_{tabela}...", _connectionStringDW);
                 LimpaTabela(linhaExec, _connectionStringDW, sistema);
-                
-                string consulta = queries
-                    .Where(x => x.SistemaTipo == idSistema && x.ConsultaTipo == tipoTabela)
-                    .Select(x => x.Consulta)
-                    .FirstOrDefault() ?? "N/A";
 
-                switch (tipoTabela)
-                {
-                    case TOTAL:
-                        tarefas.Add(Task.Run(async () => {
-                            await BuscadorPacotes(exec, TOTAL, sistema, conStr, consulta, tabela);
-                            await LogOperation(exec, Operador.FINAL_LEITURA_PACOTE, $"Concluído extração para: {tabela}", _connectionStringDW);
-                        }));
-                        break;
-                    case INCREMENTAL:
-                        tarefas.Add(Task.Run(async () => {
-                            await BuscadorPacotes(exec, INCREMENTAL, sistema, conStr, consulta, tabela, corte, coluna);
-                            await LogOperation(exec ,Operador.FINAL_LEITURA_PACOTE, $"Concluído extração para: {tabela}", _connectionStringDW);
-                        }));
-                        break;
-                    default:
-                        await LogOperation(exec, Operador.FINAL_LEITURA_PACOTE, $"Erro SQL: Não foi definido tipo de extração, para tabela {tabela}", _connectionStringDW, FALHA);
-                        break;
-                }
+                tarefas.Add(Task.Run(async () => {
+                    try
+                    {
+                        await BuscadorPacotes(exec, TOTAL, idSistema, sistema, conStr, queries, tabela);
+                        await LogOperation(exec, Operador.FINAL_LEITURA_PACOTE, $"Concluído extração para: {tabela}", _connectionStringDW);
+                    }
+                    catch (Exception)
+                    {
+                        Console.WriteLine($"Erro na busca de dados para: {tabela}");
+                    }
+                }));
+
             }
         }
         catch (SqlException ex)
@@ -121,15 +109,16 @@ public class TransferenciaDados : IDisposable
             Updater(_connectionStringDW, exec, FALHA);
         }
         finally
-        {
+        {   
             await Task.WhenAll(tarefas);
-            
             await LogOperation(exec, Operador.FINAL_SQL, "Extração Realizada.", _connectionStringDW);
             Updater(_connectionStringDW, exec, SUCESSO);
 
             await LogOperation(exec, Operador.LIBERA_RECURSO, "Liberando Recursos...", _connectionStringDW);
+            queries.Clear();
             tarefas.Clear();
             listaExec.Clear();
+            consultas.Dispose();
         }
     }
 
@@ -151,12 +140,14 @@ public class TransferenciaDados : IDisposable
         return result.ToList();
     }
 
-    private async Task BuscadorPacotes(int exec, string Tipo, string sistema, string conStr, string consulta, string? NomeTab = null, int? ValorIncremental = null, string? NomeCol = null)
+    private async Task BuscadorPacotes(int exec, string Tipo, int idSistema, string sistema, string conStr, List<ConsultaInfo> infoConsulta, string? NomeTab = null, int? ValorIncremental = null, string? NomeCol = null)
     {     
         using SqlConnection connection = new() {
             ConnectionString = conStr,
         };
         connection.Open();
+
+        string consulta = "";
 
         int? linhas = ContaLinhas($"{sistema}_{NomeTab}", _connectionStringDW);
 
@@ -169,16 +160,28 @@ public class TransferenciaDados : IDisposable
             switch ((linhas, Tipo))
             {
                 case (_, TOTAL):
+                    consulta =  infoConsulta
+                        .Where(x => x.SistemaTipo == idSistema && x.ConsultaTipo == TOTAL)
+                        .Select(x => x.Consulta)
+                        .FirstOrDefault() ?? "N/A";
                     await LogOperation(exec, Operador.ABRIR_CONEXAO, $"Conexão aberta para extração do tipo Total da tabela: {NomeTab}...", _connectionStringDW);
                     criarTabelaTemp.CommandText = consulta;
                     criarTabelaTemp.Parameters.AddWithValue("@TABELA", NomeTab);
                     break;
                 case (0, INCREMENTAL):
+                    consulta =  infoConsulta
+                        .Where(x => x.SistemaTipo == idSistema && x.ConsultaTipo == TOTAL)
+                        .Select(x => x.Consulta)
+                        .FirstOrDefault() ?? "N/A";
                     await LogOperation(exec, Operador.ABRIR_CONEXAO, $"Conexão aberta para extração do tipo Total da tabela: {NomeTab}...", _connectionStringDW);
                     criarTabelaTemp.CommandText = consulta;
                     criarTabelaTemp.Parameters.AddWithValue("@TABELA", NomeTab);
                     break;
                 case (> 0, INCREMENTAL):
+                    consulta =  infoConsulta
+                        .Where(x => x.SistemaTipo == idSistema && x.ConsultaTipo == INCREMENTAL)
+                        .Select(x => x.Consulta)
+                        .FirstOrDefault() ?? "N/A";
                     await LogOperation(exec, Operador.ABRIR_CONEXAO, $"Conexão aberta para extração do tipo Incremental da tabela: {NomeTab}...", _connectionStringDW);
                     criarTabelaTemp.CommandText = consulta;
                     criarTabelaTemp.Parameters.AddWithValue("@TABELA", NomeTab);
@@ -189,6 +192,7 @@ public class TransferenciaDados : IDisposable
                     await LogOperation(exec, Operador.ABRIR_CONEXAO, $"Conexão Aberta, mas sem tipo definido para a tabela: {NomeTab}...", _connectionStringDW, FALHA);
                     break;
             }
+            
             criarTabelaTemp.CommandTimeout = 1000;
             await criarTabelaTemp.ExecuteNonQueryAsync();
         }
@@ -338,7 +342,6 @@ public class TransferenciaDados : IDisposable
             default:
                 break;
         }
-
 
         comando.CommandTimeout = 1000;
         SqlDataAdapter adapter = new(comando);
