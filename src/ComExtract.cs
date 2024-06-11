@@ -58,7 +58,6 @@ public static class ComExtract
         {
             using ClickHouseConnection connection = new(conStr);
             connection.Open();
-            connection.ChangeDatabase("DW_EXTRACT"); // Deverá ser usado no Extract
             using ClickHouseCommand commandCont = new() {
                 CommandText = $"SELECT COUNT(*) FROM {sistema}_{nomeTab};",
                 Connection = connection
@@ -115,7 +114,6 @@ public static class ComExtract
         } else if (servidor == "CLICKHOUSE") {
             using ClickHouseConnection connection = new(conStr);
             connection.Open();
-            connection.ChangeDatabase("DW_EXTRACT");
 
             using ClickHouseCommand command = new() {
                 CommandText = $"SELECT COUNT(*) FROM {NomeTab};",
@@ -153,7 +151,6 @@ public static class ComExtract
         {
             using ClickHouseConnection connection = new(conStr);
             connection.Open();
-            connection.ChangeDatabase("DW_EXTRACT");
 
             using ClickHouseBulkCopy bulkCopy = new(connection) 
             {
