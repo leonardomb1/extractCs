@@ -1,6 +1,6 @@
 namespace IntegraCs;
 
-static public class Operador
+public static class LogInfo
 {
     public const int INSTANCIAR = 1;
     public const int ABRIR_CONEXAO = 2;

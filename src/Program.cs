@@ -2,24 +2,41 @@
 
 public class Program
 {
+    private string _connectionStringOrquest;
     private string _connectionStringDW;
+    private string _tipoServidor;
     private int _tamPacote;
     public Program()
     {
-        var configPacote = Environment.GetEnvironmentVariable("PACKET_SIZE") ?? "n/a";
-        var configDW = Environment.GetEnvironmentVariable("DW_CONNECTIONSTRING") ?? "n/a"; 
-        if(configPacote == "n/a" || configDW == "n/a") 
+        var configVariables = new Dictionary<string, string>
         {
-            Console.WriteLine("Não Configurado."); 
+            { "PACKET_SIZE", Environment.GetEnvironmentVariable("PACKET_SIZE")?? "n/a" },
+            { "DW_CONNECTIONSTRING", Environment.GetEnvironmentVariable("DW_CONNECTIONSTRING")?? "n/a" },
+            { "ORQUEST_CONNECTIONSTRING", Environment.GetEnvironmentVariable("ORQUEST_CONNECTIONSTRING")?? "n/a" },
+            { "SERVER_TYPE", Environment.GetEnvironmentVariable("SERVER_TYPE")?? "n/a" }
+        };
+
+        var anyConfigNotSet = configVariables.Any(variable => variable.Value == "n/a");
+
+        if (anyConfigNotSet)
+        {
             throw new Exception("Não Configurado!");
         }
-        _tamPacote = int.Parse(configPacote); 
-        _connectionStringDW = configDW; 
+
+        _tamPacote = int.Parse(configVariables["PACKET_SIZE"]);
+        _connectionStringDW = configVariables["DW_CONNECTIONSTRING"];
+        _connectionStringOrquest = configVariables["ORQUEST_CONNECTIONSTRING"];
+        _tipoServidor = configVariables["SERVER_TYPE"];
     }
     public void Run()
     {
         Agenda agenda = new();
-        agenda.Agendador(_connectionStringDW, _tamPacote);
+        agenda.Agendador(
+            _connectionStringOrquest, // Orquestrador
+            _connectionStringDW, // Datawarehouse
+            _tamPacote,
+            _tipoServidor
+        );
     }
     public static void Main()
     {  

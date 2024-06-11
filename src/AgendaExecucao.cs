@@ -1,37 +1,12 @@
 using System.Data;
 using System.Reactive.Linq;
-using Microsoft.Data.SqlClient;
 
 namespace IntegraCs;
-
-public class AgendaInfo
-{
-    public required Action<int> Action {get; set;}
-    public required TimeSpan Tempo {get; set;}
-    public required bool IsRunning {get; set;}
-}
-
 public class Agenda
 {
-    private DataTable GetAgenda(string destinationConnectionString)
+    public void Agendador(string orquestConStr, string dataWarehouseConStr, int packetSize, string servidor)
     {
-        Console.WriteLine("Resgantando agendas de execucao...");
-        using SqlConnection connection = new(destinationConnectionString);
-        connection.Open();
-        connection.ChangeDatabase("DW_CONTROLLER");
-
-        using SqlCommand command = new("SELECT * FROM DW_AGENDADOR", connection);
-        SqlDataAdapter adapter = new(command);
-        DataTable tabela = new();
-        adapter.Fill(tabela);
-
-        Console.WriteLine("Resgatado.");
-        return tabela;
-    }
-
-    public void Agendador(string destinationConnectionString, int packetSize)
-    {
-        DataTable agenda = GetAgenda(destinationConnectionString);
+        DataTable agenda = ComControlador.BuscaAgenda(orquestConStr);
         Dictionary<int, AgendaInfo> agendas = [];
 
         Console.WriteLine("Instanciando agenciador...");
@@ -47,7 +22,11 @@ public class Agenda
                 {
                     if (agendas[id].IsRunning) return;
 
-                    TransferenciaDados dados = new(destinationConnectionString, packetSize);
+                    TransferenciaDados dados = new(
+                        orquestConStr,
+                        dataWarehouseConStr,
+                        servidor,
+                        packetSize);
                     Console.WriteLine($"Executando agenda: {row.Field<string>("NM_AGENDA")}...");
                     agendas[id].IsRunning = true;
                     await dados.Transferir(id);
