@@ -4,7 +4,7 @@ using System.Reactive.Linq;
 namespace IntegraCs;
 public class Agenda
 {
-    public void Agendador(string orquestConStr, string dataWarehouseConStr, int packetSize, string servidor)
+    public void Agendador(string orquestConStr, string dataWarehouseConStr, int packetSize)
     {
         DataTable agenda = ComControlador.BuscaAgenda(orquestConStr);
         Dictionary<int, AgendaInfo> agendas = [];
@@ -25,7 +25,6 @@ public class Agenda
                     TransferenciaDados dados = new(
                         orquestConStr,
                         dataWarehouseConStr,
-                        servidor,
                         packetSize);
                     Console.WriteLine($"Executando agenda: {row.Field<string>("NM_AGENDA")}...");
                     agendas[id].IsRunning = true;

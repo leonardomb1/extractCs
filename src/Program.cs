@@ -4,7 +4,6 @@ public class Program
 {
     private string _connectionStringOrquest;
     private string _connectionStringDW;
-    private string _tipoServidor;
     private int _tamPacote;
     public Program()
     {
@@ -12,8 +11,7 @@ public class Program
         {
             { "PACKET_SIZE", Environment.GetEnvironmentVariable("PACKET_SIZE")?? "n/a" },
             { "DW_CONNECTIONSTRING", Environment.GetEnvironmentVariable("DW_CONNECTIONSTRING")?? "n/a" },
-            { "ORQUEST_CONNECTIONSTRING", Environment.GetEnvironmentVariable("ORQUEST_CONNECTIONSTRING")?? "n/a" },
-            { "SERVER_TYPE", Environment.GetEnvironmentVariable("SERVER_TYPE")?? "n/a" }
+            { "ORQUEST_CONNECTIONSTRING", Environment.GetEnvironmentVariable("ORQUEST_CONNECTIONSTRING")?? "n/a" }
         };
 
         var anyConfigNotSet = configVariables.Any(variable => variable.Value == "n/a");
@@ -26,7 +24,6 @@ public class Program
         _tamPacote = int.Parse(configVariables["PACKET_SIZE"]);
         _connectionStringDW = configVariables["DW_CONNECTIONSTRING"];
         _connectionStringOrquest = configVariables["ORQUEST_CONNECTIONSTRING"];
-        _tipoServidor = configVariables["SERVER_TYPE"];
     }
     public void Run()
     {
@@ -34,8 +31,7 @@ public class Program
         agenda.Agendador(
             _connectionStringOrquest, // Orquestrador
             _connectionStringDW, // Datawarehouse
-            _tamPacote,
-            _tipoServidor
+            _tamPacote
         );
     }
     public static void Main()
