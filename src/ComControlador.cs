@@ -64,7 +64,7 @@ public static class ComControlador
                     UPDATE DW_EXECUCAO SET VF_STATUS = {status} 
                     WHERE ID_DW_EXECUCAO = {numExec};
 
-                    UPDATE DW_EXECUCAO SET DT_FIM_EXEC = GETDATE() AT TIME ZONE 'UTC' AT TIME ZONE 'Atlantic Standard Time'
+                    UPDATE DW_EXECUCAO SET DT_FIM_EXEC = GETDATE()'
                     WHERE ID_DW_EXECUCAO = {numExec};
                 ",
                 Connection = updater
