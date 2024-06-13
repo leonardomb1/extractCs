@@ -91,7 +91,7 @@ public class TransferenciaDados : IDisposable
             await ComControlador.Log(
                 idExec,
                 LogInfo.INIC_LIMPA_TABELA,
-                $"Limpando Tabela: {sistema}_{tabela}...",
+                $"Limpando Tabela: {sistema}.{tabela}...",
                 _connectionStringOrquest
             );
             
@@ -186,7 +186,7 @@ public class TransferenciaDados : IDisposable
 
         int? linhas = 
             ComExtract.ContaLinhas(
-                $"{sistema}_{NomeTab}",
+                $"{sistema}.{NomeTab}",
                 conStrDw
             );
 
@@ -303,7 +303,7 @@ public class TransferenciaDados : IDisposable
             CommandTimeout = 100
         };
 
-        DataTable pacote = new() { TableName = $"{sistema}_{NomeTab}" };
+        DataTable pacote = new() { TableName = $"{sistema}.{NomeTab}" };
         await ComControlador.Log(
             exec,
             LogInfo.INIC_SQL,
