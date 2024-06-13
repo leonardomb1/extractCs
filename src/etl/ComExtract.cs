@@ -17,7 +17,7 @@ public static class ComExtract
         };
         connection.Open();
         connection.ChangeDatabase("DWExtract"); // Deverá ser usado no Extract
-        using SqlCommand commandCont = new($"SELECT COUNT(*) FROM {sistema}_{nomeTab} WITH(NOLOCK);", connection);
+        using SqlCommand commandCont = new($"SELECT COUNT(*) FROM {sistema}.{nomeTab} WITH(NOLOCK);", connection);
         commandCont.CommandTimeout = 100;
         var exec = commandCont.ExecuteScalar();
         
@@ -29,16 +29,16 @@ public static class ComExtract
         {
             case (> 0, ConstInfo.INCREMENTAL):
                 command.CommandText = 
-                    @$" DELETE FROM {sistema}_{nomeTab} 
+                    @$" DELETE FROM {sistema}.{nomeTab} 
                         WHERE [{nomeCol}] >= GETDATE() - {inclusao};";
                 command.ExecuteNonQuery();
                 break;
             case (0, ConstInfo.INCREMENTAL):
-                command.CommandText = $"TRUNCATE TABLE {sistema}_{nomeTab};";
+                command.CommandText = $"TRUNCATE TABLE {sistema}.{nomeTab};";
                 command.ExecuteNonQuery();
                 break;            
             case (_, ConstInfo.TOTAL):
-                command.CommandText = $"TRUNCATE TABLE {sistema}_{nomeTab};";
+                command.CommandText = $"TRUNCATE TABLE {sistema}.{nomeTab};";
                 command.ExecuteNonQuery();
                 break;
             default:
