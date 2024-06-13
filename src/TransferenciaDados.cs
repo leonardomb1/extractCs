@@ -7,7 +7,6 @@ public class TransferenciaDados : IDisposable
     private bool _disposed = false;
     private string _connectionStringDW;
     private string _connectionStringOrquest;
-    private string _servidorTipo;
     private int _packetSize;
     private DataTable _tabelaConsultas;
     private DataTable _tabelaExec;
@@ -33,13 +32,11 @@ public class TransferenciaDados : IDisposable
     public TransferenciaDados(
         string orquestConStr,
         string dataWarehouseConStr,
-        string servidor,
         int packetSize)
     {
         _connectionStringOrquest = orquestConStr;
         _connectionStringDW = dataWarehouseConStr;
         _packetSize = packetSize;
-        _servidorTipo = servidor;
         _tabelaConsultas = ComControlador.BuscaDados(
             @$"SELECT * FROM DW_CONSULTA",
             orquestConStr
@@ -51,7 +48,7 @@ public class TransferenciaDados : IDisposable
             INNER JOIN DW_SISTEMAS AS SIS WITH(NOLOCK)
                 ON  SIS.ID_DW_SISTEMA = LIS.ID_DW_SISTEMA;",
                 orquestConStr,
-                "DW_CONTROLLER"
+                "DWController"
         );
 
         foreach (DataRow lin in _tabelaConsultas.Rows)
@@ -104,7 +101,6 @@ public class TransferenciaDados : IDisposable
                 coluna,
                 tipoTabela,
                 sistema,
-                _servidorTipo,
                 corte
             );
 
@@ -120,7 +116,6 @@ public class TransferenciaDados : IDisposable
                         conStr,
                         _connectionStringOrquest,
                         _packetSize,
-                        _servidorTipo,
                         _consultas,
                         tabela,
                         corte,
@@ -176,7 +171,6 @@ public class TransferenciaDados : IDisposable
                                        string conStr,
                                        string conStrDw,
                                        int packetSize,
-                                       string servidor,
                                        List<ConsultaInfo> infoConsulta,
                                        string NomeTab,
                                        int? ValorIncremental,
@@ -193,8 +187,7 @@ public class TransferenciaDados : IDisposable
         int? linhas = 
             ComExtract.ContaLinhas(
                 $"{sistema}_{NomeTab}",
-                conStrDw,
-                servidor
+                conStrDw
             );
 
         try
@@ -349,7 +342,7 @@ public class TransferenciaDados : IDisposable
                         idTabela
                     );
 
-                    await ComExtract.InserirDadosBulk(pacote, conStrDw, servidor);
+                    await ComExtract.InserirDadosBulk(pacote, conStrDw);
                     pacote.Clear();
                     await ComControlador.Log(
                         exec,
@@ -373,7 +366,7 @@ public class TransferenciaDados : IDisposable
                     idTabela
                 );
 
-                await ComExtract.InserirDadosBulk(pacote, conStrDw, servidor);
+                await ComExtract.InserirDadosBulk(pacote, conStrDw);
                 await ComControlador.Log(
                     exec,
                     LogInfo.INIC_INSERT_BULK,

@@ -8,7 +8,7 @@ public static class ComControlador
     {
         using SqlConnection connection = new(conStr);
         connection.Open();  
-        connection.ChangeDatabase("DW_CONTROLLER");  // Controlador de comunicação
+        connection.ChangeDatabase("DWController");  // Controlador de comunicação
         Console.WriteLine(connection.Database);
         using SqlCommand buscaId = new() {
             CommandText = 
@@ -31,7 +31,7 @@ public static class ComControlador
 
     public static DataTable BuscaDados(string consulta,
                                      string conStr,
-                                     string database = "DW_CONTROLLER" // Banco padrão é o Controller
+                                     string database = "DWController" // Banco padrão é o Controller
                                     )
     {
         using SqlConnection connection = new() {
@@ -57,7 +57,7 @@ public static class ComControlador
     {
         using SqlConnection updater = new(conStr);
         updater.Open();
-        updater.ChangeDatabase("DW_CONTROLLER");
+        updater.ChangeDatabase("DWController");
         using SqlCommand update = new() {
             CommandText = 
                 $@"
@@ -92,7 +92,7 @@ public static class ComControlador
         string idTab = idTabela == null ? "NULL" : idTabela.ToString() ?? "NULL";
 
         await connection.OpenAsync();
-        await connection.ChangeDatabaseAsync("DW_CONTROLLER");
+        await connection.ChangeDatabaseAsync("DWController");
         Console.WriteLine(logging);
         SqlCommand log = new() {
             Connection = connection,
@@ -113,7 +113,7 @@ public static class ComControlador
         Console.WriteLine("Resgantando agendas de execucao...");
         using SqlConnection connection = new(orquestConStr);
         connection.Open();
-        connection.ChangeDatabase("DW_CONTROLLER");
+        connection.ChangeDatabase("DWController");
 
         using SqlCommand command = new("SELECT * FROM DW_AGENDADOR", connection);
         SqlDataAdapter adapter = new(command);
