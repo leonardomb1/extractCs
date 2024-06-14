@@ -39,7 +39,8 @@ public class TransferenciaDados : IDisposable
         _packetSize = packetSize;
         _tabelaConsultas = ComControlador.BuscaDados(
             @$"SELECT * FROM DW_CONSULTA",
-            orquestConStr
+            orquestConStr,
+            "DWController"
         );
         _tabelaExec = ComControlador.BuscaDados(
             @$"SELECT 
@@ -177,7 +178,7 @@ public class TransferenciaDados : IDisposable
                                        string? NomeCol)
     {     
         using SqlConnection connection = new() {
-            ConnectionString = conStr,
+            ConnectionString = conStr
         };
 
         connection.Open();
@@ -200,6 +201,7 @@ public class TransferenciaDados : IDisposable
                 ConstInfo.SUCESSO,
                 idTabela
             );
+
 
             using SqlCommand criarTabelaTemp = new() {
                 Connection = connection,
@@ -251,7 +253,6 @@ public class TransferenciaDados : IDisposable
                         .Where(x => x.SistemaTipo == idSistema && x.ConsultaTipo == ConstInfo.INCREMENTAL)
                         .Select(x => x.Consulta)
                         .FirstOrDefault() ?? "N/A";
-
                     await ComControlador.Log(
                         exec,
                         LogInfo.ABRIR_CONEXAO,
@@ -360,7 +361,7 @@ public class TransferenciaDados : IDisposable
                 await ComControlador.Log(
                     exec,
                     LogInfo.INIC_INSERT_BULK,
-                    $"Iniciando BULK Insert da tabela: {NomeTab} com {pacote.Rows.Count}",
+                    $"Iniciando BULK Insert Final da tabela: {NomeTab} com {pacote.Rows.Count}",
                     conStrDw,
                     ConstInfo.SUCESSO,
                     idTabela
@@ -370,7 +371,7 @@ public class TransferenciaDados : IDisposable
                 await ComControlador.Log(
                     exec,
                     LogInfo.INIC_INSERT_BULK,
-                    $"Finalizado BULK Insert da tabela: {NomeTab}",
+                    $"Finalizado BULK Insert Final da tabela: {NomeTab}",
                     conStrDw,
                     ConstInfo.SUCESSO,
                     idTabela

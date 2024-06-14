@@ -31,7 +31,7 @@ public class Program
         agenda.Agendador(
             _connectionStringOrquest, // Orquestrador
             _connectionStringDW, // Datawarehouse
-            _tamPacote
+            _tamPacote // Tamanho do pacote
         );
     }
     public static void Main()
