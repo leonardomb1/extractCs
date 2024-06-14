@@ -1,35 +1,26 @@
 FROM mcr.microsoft.com/dotnet/runtime:8.0 AS base
 WORKDIR /app
-USER app
+USER root
 
-# Update packages and install OpenSSH server
-RUN apt update
-RUN apt install -y openssh-server
-
-# Set the root password
-RUN echo "root:Docker!" | chpasswd
-
-# Create the /var/run/sshd directory
-RUN mkdir /var/run/sshd
-RUN chmod 0755 /var/run/sshd
-
-# Modify the SSH daemon configuration
-RUN sed -i 's/^#PermitRootLogin.*/PermitRootLogin yes/' /etc/ssh/sshd_config
-RUN sed -i 's/^#PasswordAuthentication.*/PasswordAuthentication yes/' /etc/ssh/sshd_config
-RUN sed -i 's/^#PubkeyAuthentication.*/PubkeyAuthentication yes/' /etc/ssh/sshd_config
-RUN sed -i 's/^#PermitEmptyPasswords.*/PermitEmptyPasswords no/' /etc/ssh/sshd_config
-
-# Allow the root user to login via SSH
-RUN echo "AllowUsers root" >> /etc/ssh/sshd_config
-
+RUN apt update && apt install -y openssh-server && \
+    echo "root:Docker!" | chpasswd && \
+    mkdir /var/run/sshd && \
+    chmod 0755 /var/run/sshd && \
+    sed -i 's/^#PermitRootLogin.*/PermitRootLogin yes/' /etc/ssh/sshd_config && \
+    sed -i 's/^#PasswordAuthentication.*/PasswordAuthentication yes/' /etc/ssh/sshd_config && \
+    sed -i 's/^#PubkeyAuthentication.*/PubkeyAuthentication yes/' /etc/ssh/sshd_config && \
+    sed -i 's/^#PermitEmptyPasswords.*/PermitEmptyPasswords no/' /etc/ssh/sshd_config && \
+    echo "AllowUsers root" >> /etc/ssh/sshd_config
 
 EXPOSE 2222
 
 CMD ["/usr/sbin/sshd", "-D"]
 
+
 FROM --platform=$BUILDPLATFORM mcr.microsoft.com/dotnet/sdk:8.0 AS build
 ARG configuration=Release
 WORKDIR /src
+USER app
 
 COPY ["integraCs.csproj", "./"]
 RUN dotnet restore "integraCs.csproj"
