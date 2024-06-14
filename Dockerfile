@@ -2,7 +2,7 @@ FROM mcr.microsoft.com/dotnet/runtime:8.0 AS base
 WORKDIR /app
 USER app
 
-RUN apt-get update && apt-get install -y openssh-server && \
+RUN apt update && apt install -y openssh-server && \
     echo "root:Docker!" | chpasswd && \
     mkdir /var/run/sshd && \
     chmod 0755 /var/run/sshd && \
