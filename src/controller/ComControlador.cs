@@ -9,7 +9,6 @@ public static class ComControlador
         using SqlConnection connection = new(conStr);
         connection.Open();  
         connection.ChangeDatabase("DWController");  // Controlador de comunicação
-        Console.WriteLine(connection.Database);
         using SqlCommand buscaId = new() {
             CommandText = 
                 @$"
@@ -64,7 +63,7 @@ public static class ComControlador
                     UPDATE DW_EXECUCAO SET VF_STATUS = {status} 
                     WHERE ID_DW_EXECUCAO = {numExec};
 
-                    UPDATE DW_EXECUCAO SET DT_FIM_EXEC = GETDATE()'
+                    UPDATE DW_EXECUCAO SET DT_FIM_EXEC = GETDATE()
                     WHERE ID_DW_EXECUCAO = {numExec};
                 ",
                 Connection = updater
