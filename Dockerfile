@@ -20,7 +20,6 @@ CMD ["/usr/sbin/sshd", "-D"]
 FROM --platform=$BUILDPLATFORM mcr.microsoft.com/dotnet/sdk:8.0 AS build
 ARG configuration=Release
 WORKDIR /src
-USER app
 
 COPY ["integraCs.csproj", "./"]
 RUN dotnet restore "integraCs.csproj"
