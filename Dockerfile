@@ -3,11 +3,11 @@ WORKDIR /app
 USER root
 
 RUN apt update && apt install -y openssh-server && \
-    echo "root:Docker!" | chpasswd && \
+    echo "root:Docker!" > /etc/passwd && \
     mkdir /var/run/sshd && \
     chmod 0755 /var/run/sshd && \
     sed -i 's/^#PermitRootLogin.*/PermitRootLogin yes/' /etc/ssh/sshd_config && \
-    sed -i 's/^#PasswordAuthentication.*/PasswordAuthentication yes/' /etc/ssh/sshd_config && \
+    sed -i 's/^#PasswordAuthentication.*/PasswordAuthentication no/' /etc/ssh/sshd_config && \
     sed -i 's/^#PubkeyAuthentication.*/PubkeyAuthentication yes/' /etc/ssh/sshd_config && \
     sed -i 's/^#PermitEmptyPasswords.*/PermitEmptyPasswords no/' /etc/ssh/sshd_config && \
     echo "AllowUsers root" >> /etc/ssh/sshd_config
