@@ -1,9 +1,7 @@
-FROM mcr.microsoft.com/dotnet/runtime:8.0 AS base
+FROM debian:slim AS base
 WORKDIR /app
-USER app
 
-FROM --platform=$BUILDPLATFORM mcr.microsoft.com/dotnet/sdk:8.0 AS build
-ARG configuration=Release
+FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
 WORKDIR /src
 
 COPY ["integraCs.csproj", "./"]
@@ -11,16 +9,11 @@ RUN dotnet restore "integraCs.csproj"
 
 COPY . .
 
-RUN dotnet build "integraCs.csproj" -c $configuration -o /app/build
-
-FROM build AS publish
-ARG configuration=Release
-RUN dotnet publish "integraCs.csproj" -c $configuration -o /app/publish /p:UseAppHost=false
-
+RUN dotnet publish "integraCs.csproj" --os linux --arch x64 --sc true --ucr true -o /app/publish -p:PublishSingleFile=true -p:EnableCompressionSingleFile=true -p:IncludeAllContentForSelfExtract=true -p:DebugType=None -p:DebugSymbols=false
 
 FROM base AS final
 WORKDIR /app
 
-COPY --from=publish /app/publish .
+COPY --from=build /app/publish .
 
-ENTRYPOINT ["dotnet", "integraCs.dll"]
+ENTRYPOINT ["./extractCs"]
