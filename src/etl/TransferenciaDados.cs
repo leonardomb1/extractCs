@@ -71,7 +71,11 @@ public class TransferenciaDados : IDisposable
     public async Task Transferir(int agenda)
     {
         List<Task> tarefas = [];
-        int idExecAtual = 0;
+
+        int idExec = ComControlador.BuscaIdExec(
+            _connectionStringOrquest,
+            agenda
+        ); // Resgata id de execução
 
         foreach(DataRow linExt in _tabelaExec.Rows)
         {
@@ -83,12 +87,7 @@ public class TransferenciaDados : IDisposable
             string conStr = linExt.Field<string>("DS_CONSTRING") ?? "N/A";  
             string sistema = linExt.Field<string>("NM_SISTEMA") ?? "N/A";
             string tipoTabela = linExt.Field<string>("TP_TABELA") ?? "N/A";
-
-            int idExec = ComControlador.BuscaIdExec(
-                _connectionStringOrquest,
-                agenda
-            ); // Resgata id de execução
-            
+          
             await ComControlador.Log(
                 idExec,
                 LogInfo.LIMPA_TABELA,
@@ -149,12 +148,12 @@ public class TransferenciaDados : IDisposable
     
         ComControlador.AtualizaTempoFinalExe(
             _connectionStringOrquest,
-            idExecAtual,
+            idExec,
             ConstInfo.SUCESSO
         );
 
         await ComControlador.Log(
-            idExecAtual,
+            idExec,
             LogInfo.LIBERA_RECURSO,
             "Liberando Recursos...",
             _connectionStringOrquest
