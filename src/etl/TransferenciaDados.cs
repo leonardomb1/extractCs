@@ -91,7 +91,7 @@ public class TransferenciaDados : IDisposable
             
             await ComControlador.Log(
                 idExec,
-                LogInfo.INIC_LIMPA_TABELA,
+                LogInfo.LIMPA_TABELA,
                 $"Limpando Tabela: {sistema}.{tabela}...",
                 _connectionStringOrquest
             );
@@ -125,7 +125,7 @@ public class TransferenciaDados : IDisposable
 
                     await ComControlador.Log(
                         idExec,
-                        LogInfo.FINAL_LEITURA_PACOTE,
+                        LogInfo.LEITURA_PACOTE,
                         $"Concluído extração para: {tabela}",
                         _connectionStringOrquest,
                         ConstInfo.SUCESSO,
@@ -136,7 +136,7 @@ public class TransferenciaDados : IDisposable
                 {
                     await ComControlador.Log(
                         idExec,
-                        LogInfo.FINAL_LEITURA_PACOTE,
+                        LogInfo.LEITURA_PACOTE,
                         $"Erro na extração para: {tabela}, com erro : {ex}",
                         _connectionStringOrquest,
                         ConstInfo.FALHA,
@@ -336,7 +336,7 @@ public class TransferenciaDados : IDisposable
                 {
                     await ComControlador.Log(
                         exec,
-                        LogInfo.INIC_INSERT_BULK,
+                        LogInfo.INIC_SQL,
                         $"Iniciando BULK Insert da tabela: {NomeTab} com {pacote.Rows.Count} Linhas.",
                         conStrDw,
                         ConstInfo.SUCESSO,
@@ -347,7 +347,7 @@ public class TransferenciaDados : IDisposable
                     pacote.Clear();
                     await ComControlador.Log(
                         exec,
-                        LogInfo.INIC_INSERT_BULK,
+                        LogInfo.INIC_SQL,
                         $"Finalizado BULK Insert da tabela: {NomeTab}",
                         conStrDw,
                         ConstInfo.SUCESSO,
@@ -360,7 +360,7 @@ public class TransferenciaDados : IDisposable
             {
                 await ComControlador.Log(
                     exec,
-                    LogInfo.INIC_INSERT_BULK,
+                    LogInfo.INIC_SQL,
                     $"Iniciando BULK Insert Final da tabela: {NomeTab} com {pacote.Rows.Count}",
                     conStrDw,
                     ConstInfo.SUCESSO,
@@ -370,7 +370,7 @@ public class TransferenciaDados : IDisposable
                 await ComExtract.InserirDadosBulk(pacote, conStrDw);
                 await ComControlador.Log(
                     exec,
-                    LogInfo.INIC_INSERT_BULK,
+                    LogInfo.INIC_SQL,
                     $"Finalizado BULK Insert Final da tabela: {NomeTab}",
                     conStrDw,
                     ConstInfo.SUCESSO,
@@ -401,7 +401,7 @@ public class TransferenciaDados : IDisposable
 
         await ComControlador.Log(
             exec,
-            LogInfo.INIC_SQL,
+            LogInfo.FINAL_SQL,
             $"Deletando tabela temporaria: ##T_{NomeTab}_DW_SEL...",
             conStrDw,
             ConstInfo.SUCESSO,
