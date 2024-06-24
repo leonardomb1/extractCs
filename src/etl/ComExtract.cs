@@ -22,6 +22,8 @@ public static class ComExtract
         var exec = commandCont.ExecuteScalar();
         
         int linhas = Convert.ToInt32(exec == DBNull.Value ? 0 : exec);
+        
+        Console.WriteLine($"{sistema}.{nomeTab}");
 
         SqlCommand command = new("", connection);
 
@@ -30,7 +32,7 @@ public static class ComExtract
             case (> 0, ConstInfo.INCREMENTAL):
                 command.CommandText = 
                     @$" DELETE FROM {sistema}.{nomeTab} 
-                        WHERE [{nomeCol}] >= GETDATE() - {inclusao};";
+                        WHERE [{nomeCol}] >= GETDATE() - {inclusao ?? 0};";
                 command.ExecuteNonQuery();
                 break;
             case (0, ConstInfo.INCREMENTAL):

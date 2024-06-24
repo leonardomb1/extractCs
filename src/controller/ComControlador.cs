@@ -1,4 +1,5 @@
 using System.Data;
+using System.Reflection;
 using Microsoft.Data.SqlClient;
 
 namespace IntegraCs;
@@ -79,25 +80,29 @@ public static class ComControlador
                                  string logging,
                                  string conStr,
                                  int sucesso = ConstInfo.SUCESSO, // Considera que por padrão operações são logadas quando há sucesso.
-                                 int? idTabela = null)
+                                 int? idTabela = null,
+                                 string logType = "INFO",
+                                 [System.Runtime.CompilerServices.CallerMemberName] string? callerMethod = null
+                                 )
     {
         using SqlConnection connection = new() {
             ConnectionString = conStr
         };
-        
 
         string idExec = exec.ToString() ?? "NULL";
         string idOp = cdLog.ToString() ?? "NULL";
         string idTab = idTabela == null ? "NULL" : idTabela.ToString() ?? "NULL";
 
+        string logInfo = $"[AT {callerMethod}]::[{logType}]: {logging}";
+        
         await connection.OpenAsync();
         await connection.ChangeDatabaseAsync("DWController");
-        Console.WriteLine(logging);
+        Console.WriteLine($"{logInfo}");
         SqlCommand log = new() {
             Connection = connection,
             CommandText = 
                 $@"INSERT INTO DW_LOG (ID_DW_EXECUCAO, ID_DW_OPERACAO, DS_LOG, VF_SUCESSO, ID_DW_EXTLIST)
-                VALUES({idExec}, {idOp}, '{logging}', {sucesso}, {idTab})"
+                VALUES({idExec}, {idOp}, '{logInfo}', {sucesso}, {idTab})"
         };
 
         await log.ExecuteNonQueryAsync();
@@ -109,17 +114,14 @@ public static class ComControlador
 
     public static DataTable BuscaAgenda(string orquestConStr)
     {
-        Console.WriteLine("Resgantando agendas de execucao...");
         using SqlConnection connection = new(orquestConStr);
         connection.Open();
         connection.ChangeDatabase("DWController");
 
-        using SqlCommand command = new("SELECT * FROM DW_AGENDADOR", connection);
+        using SqlCommand command = new("SELECT * FROM DW_AGENDADOR WHERE VF_ATIVO = 1;", connection);
         SqlDataAdapter adapter = new(command);
         DataTable tabela = new();
         adapter.Fill(tabela);
-
-        Console.WriteLine("Resgatado.");
         return tabela;
     }
 

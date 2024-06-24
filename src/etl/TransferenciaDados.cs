@@ -32,7 +32,8 @@ public class TransferenciaDados : IDisposable
     public TransferenciaDados(
         string orquestConStr,
         string dataWarehouseConStr,
-        int packetSize)
+        int packetSize,
+        int agenda)
     {
         _connectionStringOrquest = orquestConStr;
         _connectionStringDW = dataWarehouseConStr;
@@ -47,7 +48,8 @@ public class TransferenciaDados : IDisposable
                 *
             FROM DW_EXTLIST AS LIS WITH(NOLOCK)
             INNER JOIN DW_SISTEMAS AS SIS WITH(NOLOCK)
-                ON  SIS.ID_DW_SISTEMA = LIS.ID_DW_SISTEMA;",
+                ON  SIS.ID_DW_SISTEMA = LIS.ID_DW_SISTEMA
+            WHERE ID_DW_AGENDADOR = {agenda};",
                 orquestConStr,
                 "DWController"
         );
@@ -92,7 +94,10 @@ public class TransferenciaDados : IDisposable
                 idExec,
                 LogInfo.LIMPA_TABELA,
                 $"Limpando Tabela: {sistema}.{tabela}...",
-                _connectionStringOrquest
+                _connectionStringOrquest,
+                ConstInfo.SUCESSO,
+                null,
+                "INFO"
             );
             
             ComExtract.LimpaTabela(
@@ -128,7 +133,8 @@ public class TransferenciaDados : IDisposable
                         $"Concluído extração para: {tabela}",
                         _connectionStringOrquest,
                         ConstInfo.SUCESSO,
-                        idTabela
+                        idTabela,
+                        "SUCCESS"
                     );
                 }
                 catch (Exception ex)
@@ -139,7 +145,8 @@ public class TransferenciaDados : IDisposable
                         $"Erro na extração para: {tabela}, com erro : {ex}",
                         _connectionStringOrquest,
                         ConstInfo.FALHA,
-                        idTabela
+                        idTabela,
+                        "ERROR"
                     );
                 }
             }));
@@ -155,8 +162,11 @@ public class TransferenciaDados : IDisposable
         await ComControlador.Log(
             idExec,
             LogInfo.LIBERA_RECURSO,
-            "Liberando Recursos...",
-            _connectionStringOrquest
+            $"Liberando Recursos...",
+            _connectionStringOrquest,
+            ConstInfo.SUCESSO,
+            null,
+            "SUCCESS"
         );
 
         tarefas.ForEach(t => t.Dispose());
@@ -274,7 +284,8 @@ public class TransferenciaDados : IDisposable
                         $"Conexão Aberta, mas sem tipo definido para a tabela: {NomeTab}...",
                         conStrDw,
                         ConstInfo.FALHA,
-                        idTabela
+                        idTabela,
+                        "WARN"
                     );
                     break;
             }
@@ -287,7 +298,8 @@ public class TransferenciaDados : IDisposable
                 $"Erro SQL: na tabela {NomeTab} ao tentar criar tabela temporária. {ex}",
                 conStrDw,
                 ConstInfo.FALHA,
-                idTabela
+                idTabela,
+                "ERROR"
             );
         }
 
@@ -336,7 +348,7 @@ public class TransferenciaDados : IDisposable
                     await ComControlador.Log(
                         exec,
                         LogInfo.INIC_SQL,
-                        $"Iniciando BULK Insert da tabela: {NomeTab} com {pacote.Rows.Count} Linhas.",
+                        $"Iniciando BULK Insert da tabela: {NomeTab} com {pacote.Rows.Count} linhas.",
                         conStrDw,
                         ConstInfo.SUCESSO,
                         idTabela
@@ -360,7 +372,7 @@ public class TransferenciaDados : IDisposable
                 await ComControlador.Log(
                     exec,
                     LogInfo.INIC_SQL,
-                    $"Iniciando BULK Insert Final da tabela: {NomeTab} com {pacote.Rows.Count}",
+                    $"Iniciando BULK Insert Final da tabela: {NomeTab} com {pacote.Rows.Count} linhas.",
                     conStrDw,
                     ConstInfo.SUCESSO,
                     idTabela
@@ -373,7 +385,8 @@ public class TransferenciaDados : IDisposable
                     $"Finalizado BULK Insert Final da tabela: {NomeTab}",
                     conStrDw,
                     ConstInfo.SUCESSO,
-                    idTabela
+                    idTabela,
+                    "SUCCESS"
                 );
             }
 
@@ -387,7 +400,8 @@ public class TransferenciaDados : IDisposable
                 $"Erro SQL: {ex} na tabela {NomeTab} ao tentar executar inserção de dados",
                 conStrDw,
                 ConstInfo.FALHA,
-                idTabela
+                idTabela,
+                "ERROR"
             );
         }
         finally
