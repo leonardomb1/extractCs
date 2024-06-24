@@ -9,8 +9,8 @@ public class Agenda
         DataTable agenda = ComControlador.BuscaAgenda(orquestConStr);
         Dictionary<int, AgendaInfo> agendas = [];
 
-        Console.WriteLine("Instanciando agenciador...");
-        Console.WriteLine("Pressione qualquer tecla para parar...");
+        Console.WriteLine($"Instanciando agenciador...");
+        Console.WriteLine($"Pressione qualquer tecla para parar...");
 
         foreach(DataRow row in agenda.Rows)
         {
@@ -25,7 +25,8 @@ public class Agenda
                     TransferenciaDados dados = new(
                         orquestConStr,
                         dataWarehouseConStr,
-                        packetSize);
+                        packetSize,
+                        id);
                     Console.WriteLine($"Executando agenda: {row.Field<string>("NM_AGENDA")}...");
                     agendas[id].IsRunning = true;
                     await dados.Transferir(id);
