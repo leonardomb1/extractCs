@@ -22,8 +22,6 @@ public static class ComExtract
         var exec = commandCont.ExecuteScalar();
         
         int linhas = Convert.ToInt32(exec == DBNull.Value ? 0 : exec);
-        
-        Console.WriteLine($"{sistema}.{nomeTab}");
 
         SqlCommand command = new("", connection);
 
