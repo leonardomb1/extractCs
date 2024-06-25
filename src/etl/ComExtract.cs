@@ -4,22 +4,30 @@ using Microsoft.Data.SqlClient;
 namespace IntegraCs;
 public static class ComExtract
 {
-    public static void LimpaTabela(
+    public static async Task LimpaTabela(
         string nomeTab,
         string conStr,
         string? nomeCol,
         string tipoTab,
         string sistema,
+        int idSistema,
+        List<ConsultaInfo> infoConsulta,
         int? inclusao)
     {
+        string consulta = infoConsulta
+                        .Where(x => x.SistemaTipo == idSistema && x.ConsultaTipo == ConstInfo.DELETE)
+                        .Select(x => x.Consulta)
+                        .FirstOrDefault() ?? "N/A";
+        
         using SqlConnection connection = new() {
             ConnectionString = conStr
         };
-        connection.Open();
-        connection.ChangeDatabase("DWExtract"); // Deverá ser usado no Extract
+
+        await connection.OpenAsync();
+        await connection.ChangeDatabaseAsync("DWExtract"); // Deverá ser usado no Extract
         using SqlCommand commandCont = new($"SELECT COUNT(*) FROM {sistema}.{nomeTab} WITH(NOLOCK);", connection);
         commandCont.CommandTimeout = 100;
-        var exec = commandCont.ExecuteScalar();
+        var exec = commandCont.ExecuteScalarAsync().Result;
         
         int linhas = Convert.ToInt32(exec == DBNull.Value ? 0 : exec);
 
@@ -28,25 +36,26 @@ public static class ComExtract
         switch ((linhas, tipoTab))
         {
             case (> 0, ConstInfo.INCREMENTAL):
-                command.CommandText = 
-                    @$" DELETE FROM {sistema}.{nomeTab} 
-                        WHERE [{nomeCol}] >= GETDATE() - {inclusao ?? 0};";
-                command.ExecuteNonQuery();
+                command.CommandText = consulta;
+                command.Parameters.AddWithValue("@TABELA", nomeTab);
+                command.Parameters.AddWithValue("@VL_CORTE", inclusao.ToString());
+                command.Parameters.AddWithValue("@COL_DT", nomeCol);
+                await command.ExecuteNonQueryAsync();
                 break;
             case (0, ConstInfo.INCREMENTAL):
                 command.CommandText = $"TRUNCATE TABLE {sistema}.{nomeTab};";
-                command.ExecuteNonQuery();
+                await command.ExecuteNonQueryAsync();
                 break;            
             case (_, ConstInfo.TOTAL):
                 command.CommandText = $"TRUNCATE TABLE {sistema}.{nomeTab};";
-                command.ExecuteNonQuery();
+                await command.ExecuteNonQueryAsync();
                 break;
             default:
                 break;
         }
 
-        connection.Close();
-        connection.Dispose();
+        await connection.CloseAsync();
+        await connection.DisposeAsync();
     }
 
     public static int ContaLinhas(string NomeTab, string conStr)
