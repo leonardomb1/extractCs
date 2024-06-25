@@ -100,12 +100,14 @@ public class TransferenciaDados : IDisposable
                 "INFO"
             );
             
-            ComExtract.LimpaTabela(
+            await ComExtract.LimpaTabela(
                 tabela,
                 _connectionStringDW,
                 coluna,
                 tipoTabela,
                 sistema,
+                idSistema,
+                _consultas,
                 corte
             );
 
