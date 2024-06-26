@@ -33,7 +33,8 @@ public class TransferenciaDados : IDisposable
         string orquestConStr,
         string dataWarehouseConStr,
         int packetSize,
-        int agenda)
+        int agenda,
+        int sistema)
     {
         _connectionStringOrquest = orquestConStr;
         _connectionStringDW = dataWarehouseConStr;
@@ -48,7 +49,8 @@ public class TransferenciaDados : IDisposable
                 *
             FROM DW_EXTLIST AS LIS WITH(NOLOCK)
             INNER JOIN DW_SISTEMAS AS SIS WITH(NOLOCK)
-                ON  SIS.ID_DW_SISTEMA = LIS.ID_DW_SISTEMA
+                ON  SIS.ID_DW_SISTEMA = LIS.ID_DW_SISTEMA AND
+                    SIS.ID_DW_SISTEMA = {sistema}
             WHERE ID_DW_AGENDADOR = {agenda};",
                 orquestConStr,
                 "DWController"
