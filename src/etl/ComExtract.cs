@@ -12,6 +12,7 @@ public static class ComExtract
         string sistema,
         int idSistema,
         List<ConsultaInfo> infoConsulta,
+        string nomeInd,
         int? inclusao)
     {
         string consulta = infoConsulta
@@ -37,6 +38,7 @@ public static class ComExtract
         {
             case (> 0, ConstInfo.INCREMENTAL):
                 command.CommandText = consulta;
+                command.Parameters.AddWithValue("@NOMEIND", nomeInd);
                 command.Parameters.AddWithValue("@TABELA", nomeTab);
                 command.Parameters.AddWithValue("@VL_CORTE", inclusao.ToString());
                 command.Parameters.AddWithValue("@COL_DT", nomeCol);

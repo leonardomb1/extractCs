@@ -91,6 +91,7 @@ public class TransferenciaDados : IDisposable
             string conStr = linExt.Field<string>("DS_CONSTRING") ?? "N/A";  
             string sistema = linExt.Field<string>("NM_SISTEMA") ?? "N/A";
             string tipoTabela = linExt.Field<string>("TP_TABELA") ?? "N/A";
+            string nomeInd = linExt.Field<string>("NM_INDIC") ?? "N/A";
           
             await ComControlador.Log(
                 idExec,
@@ -110,6 +111,7 @@ public class TransferenciaDados : IDisposable
                 sistema,
                 idSistema,
                 _consultas,
+                nomeInd,
                 corte
             );
 
