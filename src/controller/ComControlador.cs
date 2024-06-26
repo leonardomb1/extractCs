@@ -111,13 +111,24 @@ public static class ComControlador
         await log.DisposeAsync();
     }
 
-    public static DataTable BuscaAgenda(string orquestConStr)
+    public static DataTable BuscaAgenda(string orquestConStr, int sistema)
     {
         using SqlConnection connection = new(orquestConStr);
         connection.Open();
         connection.ChangeDatabase("DWController");
 
-        using SqlCommand command = new("SELECT * FROM DW_AGENDADOR WHERE VF_ATIVO = 1;", connection);
+        using SqlCommand command = new(
+            $@"SELECT * 
+              FROM DW_AGENDADOR AS AGN
+              WHERE 
+                VF_ATIVO = 1
+                AND EXISTS (
+                    SELECT 1
+                    FROM DW_EXTLIST
+                    WHERE ID_DW_SISTEMA = 1 AND ID_DW_SISTEMA = {sistema}
+             );", 
+            connection
+        );
         SqlDataAdapter adapter = new(command);
         DataTable tabela = new();
         adapter.Fill(tabela);
