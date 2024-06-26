@@ -1,5 +1,4 @@
 using System.Data;
-using System.Reflection;
 using Microsoft.Data.SqlClient;
 
 namespace IntegraCs;
