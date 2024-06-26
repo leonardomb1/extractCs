@@ -6,7 +6,7 @@ public class Agenda
 {
     public void Agendador(string orquestConStr, string dataWarehouseConStr, int packetSize, int sistema)
     {
-        DataTable agenda = ComControlador.BuscaAgenda(orquestConStr);
+        DataTable agenda = ComControlador.BuscaAgenda(orquestConStr, sistema);
         Dictionary<int, AgendaInfo> agendas = [];
 
         Console.WriteLine($"Instanciando agenciador...");
