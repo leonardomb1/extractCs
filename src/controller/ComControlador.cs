@@ -124,8 +124,10 @@ public static class ComControlador
                 VF_ATIVO = 1
                 AND EXISTS (
                     SELECT 1
-                    FROM DW_EXTLIST
-                    WHERE ID_DW_SISTEMA = {sistema}
+                    FROM DW_EXTLIST AS EXT
+                    WHERE 
+                        ID_DW_SISTEMA = {sistema} AND
+                        EXT.ID_DW_AGENDADOR = AGN.ID_DW_AGENDADOR
              );", 
             connection
         );
