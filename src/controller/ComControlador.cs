@@ -125,7 +125,7 @@ public static class ComControlador
                 AND EXISTS (
                     SELECT 1
                     FROM DW_EXTLIST
-                    WHERE ID_DW_SISTEMA = 1 AND ID_DW_SISTEMA = {sistema}
+                    WHERE ID_DW_SISTEMA = {sistema}
              );", 
             connection
         );
