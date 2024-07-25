@@ -1,10 +1,8 @@
-version: '3'
+version: '3.4'
+
 services:
-  extractcs:
-    image: extractcs
-    ports:
-      - "48650:8080"
-    environment:
-      - PACKET_SIZE=103000
-      - DW_CONNECTIONSTRING=Data Source=KAERIPINDSQLSRV\\DW;Database=DWExtract;User Id=integrador;Password=pALeN2BzbrgQ3Z5n;TrustServerCertificate=True;Encrypt=False;Packet Size=32767;Pooling=True;Max Pool Size=500;MultipleActiveResultSets=True;Connect Timeout=500;
-      - ORQUEST_CONNECTIONSTRING=Data Source=KAERIPINDSQLSRV\\DW;Database=DWController;User Id=integrador;Password=pALeN2BzbrgQ3Z5n;TrustServerCertificate=True;Encrypt=False;Packet Size=32767;Pooling=True;Max Pool Size=500;MultipleActiveResultSets=True;Connect Timeout=500;
+  integracs:
+    image: integracs
+    build:
+      context: .
+      dockerfile: ./Dockerfile
