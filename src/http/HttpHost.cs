@@ -7,7 +7,7 @@ public class HttpHost
 {
     private HttpListener _listener;
     private const int PORT = 8080;
-    private const string IP = "127.0.0.1";
+    private const string IP = "*";
     private string _connectionStringDW;
     private string _connectionStringOrquest;
     private int _packetSize;
