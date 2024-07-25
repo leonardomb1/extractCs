@@ -91,29 +91,7 @@ public class TransferenciaDados : IDisposable
             string conStr = linExt.Field<string>("DS_CONSTRING") ?? "N/A";  
             string sistema = linExt.Field<string>("NM_SISTEMA") ?? "N/A";
             string tipoTabela = linExt.Field<string>("TP_TABELA") ?? "N/A";
-            string nomeInd = linExt.Field<string>("NM_INDIC") ?? "N/A";
-          
-            await ComControlador.Log(
-                idExec,
-                LogInfo.LIMPA_TABELA,
-                $"Limpando Tabela: {sistema}.{tabela}...",
-                _connectionStringOrquest,
-                ConstInfo.SUCESSO,
-                null,
-                "INFO"
-            );
-            
-            await ComExtract.LimpaTabela(
-                tabela,
-                _connectionStringDW,
-                coluna,
-                tipoTabela,
-                sistema,
-                idSistema,
-                _consultas,
-                nomeInd,
-                corte
-            );
+            string nomeInd = linExt.Field<string>("NM_INDIC") ?? "N/A";      
 
             tarefas.Add(Task.Run(async () => {
                 try
@@ -130,7 +108,8 @@ public class TransferenciaDados : IDisposable
                         _consultas,
                         tabela,
                         corte,
-                        coluna
+                        coluna,
+                        nomeInd
                     );
 
                     await ComControlador.Log(
@@ -190,7 +169,8 @@ public class TransferenciaDados : IDisposable
                                        List<ConsultaInfo> infoConsulta,
                                        string NomeTab,
                                        int? ValorIncremental,
-                                       string? NomeCol)
+                                       string? NomeCol,
+                                       string nomeInd)
     {     
         using SqlConnection connection = new() {
             ConnectionString = conStr
@@ -320,6 +300,29 @@ public class TransferenciaDados : IDisposable
             CommandText = $"DROP TABLE IF EXISTS ##T_{NomeTab}_DW_SEL;",
             CommandTimeout = 100
         };
+
+
+        await ComControlador.Log(
+            exec,
+            LogInfo.LIMPA_TABELA,
+            $"Limpando Tabela: {sistema}.{NomeTab}...",
+            conStrDw,
+            ConstInfo.SUCESSO,
+            null,
+            "INFO"
+        );
+
+        await ComExtract.LimpaTabela(
+            NomeTab,
+            conStrDw,
+            NomeCol,
+            Tipo,
+            sistema,
+            idSistema,
+            infoConsulta,
+            nomeInd,
+            ValorIncremental
+        );
 
         DataTable pacote = new() { TableName = $"{sistema}.{NomeTab}" };
         await ComControlador.Log(
